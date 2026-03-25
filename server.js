@@ -7,47 +7,67 @@ app.use(express.static('public'));
 
 let players = {};
 let hostId = null;
-let connectedClients = []; // 💡 접속한 여행자들의 순서를 기억하는 명부
 
 io.on('connection', (socket) => {
     console.log('새로운 여행자 접속:', socket.id);
-    connectedClients.push(socket.id);
     
-    if (!hostId) hostId = socket.id;
+    // 💡 첫 접속자를 지휘자(방장)로 임명
+    if (!hostId) {
+        hostId = socket.id;
+    }
+
     players[socket.id] = { id: socket.id };
 
-    // 누군가 들어올 때마다 대기실 인원과 순서를 모두에게 방송합니다.
+    // 💡 대기실 정보 갱신 (참가자 리스트 포함)
     io.emit('lobbyUpdate', {
         hostId: hostId,
-        playerCount: connectedClients.length,
-        clients: connectedClients
+        playerCount: Object.keys(players).length,
+        clients: Object.keys(players) // 클라이언트 리스트 추가
     });
 
     socket.emit('init', { id: socket.id, isHost: (socket.id === hostId) });
 
+    // 💡 방장이 시작 버튼을 누르면 모두에게 게임 시작을 알립니다.
     socket.on('startGame', (config) => {
-        if (socket.id === hostId) io.emit('gameStarted', config);
+        if (socket.id === hostId) {
+            io.emit('gameStarted', config);
+        }
     });
 
-    // 💡 [영혼의 동기화] 플레이어의 위치, 포탑 건설, 채팅을 다른 차원에 중계합니다.
-    socket.on('playerUpdate', (data) => socket.broadcast.emit('playerUpdate', data));
-    socket.on('buildTurret', (data) => socket.broadcast.emit('buildTurret', data));
-    socket.on('upgradeTurret', (data) => socket.broadcast.emit('upgradeTurret', data));
-    socket.on('sellTurret', (data) => socket.broadcast.emit('sellTurret', data));
-    socket.on('chatMsg', (data) => socket.broadcast.emit('chatMsg', data));
+    // 💡 참가자가 보내는 입력 신호를 방장에게 전달
+    socket.on('playerInput', (data) => {
+        if (hostId && socket.id !== hostId) {
+            io.to(hostId).emit('remoteInput', data);
+        }
+    });
+
+    // 💡 [핵심] 방장이 보낸 '모든 게임 상태'를 참가자들에게 배송
+    socket.on('syncState', (stateData) => {
+        if (socket.id === hostId) {
+            // 방장을 제외한 나머지 사람들에게 'updateState'로 전달
+            socket.broadcast.emit('updateState', stateData);
+        }
+    });
 
     socket.on('disconnect', () => {
         console.log('여행자 이탈:', socket.id);
-        connectedClients = connectedClients.filter(id => id !== socket.id);
         delete players[socket.id];
         
+        // 💡 방장이 떠나면 다음 사람에게 지휘권을 넘깁니다.
         if (socket.id === hostId) {
-            hostId = connectedClients.length > 0 ? connectedClients[0] : null;
+            let remaining = Object.keys(players);
+            if (remaining.length > 0) {
+                hostId = remaining[0];
+            } else {
+                hostId = null;
+            }
         }
+        
+        // 💡 인원 갱신 정보를 다시 보냅니다.
         io.emit('lobbyUpdate', {
             hostId: hostId,
-            playerCount: connectedClients.length,
-            clients: connectedClients
+            playerCount: Object.keys(players).length,
+            clients: Object.keys(players)
         });
     });
 });
