@@ -7,62 +7,47 @@ app.use(express.static('public'));
 
 let players = {};
 let hostId = null;
+let connectedClients = []; // 💡 접속한 여행자들의 순서를 기억하는 명부
 
 io.on('connection', (socket) => {
     console.log('새로운 여행자 접속:', socket.id);
+    connectedClients.push(socket.id);
     
-    // 💡 첫 접속자를 지휘자(방장)로 임명
     if (!hostId) hostId = socket.id;
-
     players[socket.id] = { id: socket.id };
 
-    // 💡 누군가 들어올 때마다 대기실 인원을 모두에게 방송합니다.
+    // 누군가 들어올 때마다 대기실 인원과 순서를 모두에게 방송합니다.
     io.emit('lobbyUpdate', {
         hostId: hostId,
-        playerCount: Object.keys(players).length,
-        players: players
+        playerCount: connectedClients.length,
+        clients: connectedClients
     });
 
     socket.emit('init', { id: socket.id, isHost: (socket.id === hostId) });
 
-    // 💡 방장이 시작 버튼을 누르면 모두에게 게임 시작을 알립니다.
     socket.on('startGame', (config) => {
-        if (socket.id === hostId) {
-            io.emit('gameStarted', config);
-        }
+        if (socket.id === hostId) io.emit('gameStarted', config);
     });
 
-    socket.on('playerInput', (data) => {
-        if (hostId && socket.id !== hostId) {
-            io.to(hostId).emit('remoteInput', { id: socket.id, input: data });
-        }
-    });
-
-    socket.on('syncState', (stateData) => {
-        if (socket.id === hostId) {
-            socket.broadcast.emit('updateState', stateData);
-        }
-    });
+    // 💡 [영혼의 동기화] 플레이어의 위치, 포탑 건설, 채팅을 다른 차원에 중계합니다.
+    socket.on('playerUpdate', (data) => socket.broadcast.emit('playerUpdate', data));
+    socket.on('buildTurret', (data) => socket.broadcast.emit('buildTurret', data));
+    socket.on('upgradeTurret', (data) => socket.broadcast.emit('upgradeTurret', data));
+    socket.on('sellTurret', (data) => socket.broadcast.emit('sellTurret', data));
+    socket.on('chatMsg', (data) => socket.broadcast.emit('chatMsg', data));
 
     socket.on('disconnect', () => {
         console.log('여행자 이탈:', socket.id);
+        connectedClients = connectedClients.filter(id => id !== socket.id);
         delete players[socket.id];
         
-        // 💡 방장이 떠나면 다음 사람에게 지휘권을 넘깁니다.
         if (socket.id === hostId) {
-            let remaining = Object.keys(players);
-            if (remaining.length > 0) {
-                hostId = remaining[0];
-            } else {
-                hostId = null;
-            }
+            hostId = connectedClients.length > 0 ? connectedClients[0] : null;
         }
-        
-        // 💡 누군가 나갔을 때도 대기실 인원을 갱신합니다.
         io.emit('lobbyUpdate', {
             hostId: hostId,
-            playerCount: Object.keys(players).length,
-            players: players
+            playerCount: connectedClients.length,
+            clients: connectedClients
         });
     });
 });
