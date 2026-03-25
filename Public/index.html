@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PEANUT COLISEUM - 우주의 투우장</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Orbitron:wght@700&display=swap" rel="stylesheet">
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+
+  <style>
+    body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100dvh; width: 100vw; background-color: #020204; overflow: hidden; font-family: 'Noto Sans KR', sans-serif; user-select: none; touch-action: none; }
+    canvas { position: absolute; top: 0; left: 0; z-index: 1; }
+    #ui-container { position: absolute; z-index: 10; width: 90%; max-width: 550px; }
+    .glass-panel { background: rgba(31, 31, 31, 0.92); border: 1px solid rgba(255, 206, 0, 0.2); border-radius: 12px; padding: 30px; text-align: center; color: white; box-shadow: 0 15px 40px rgba(0,0,0,0.8); backdrop-filter: blur(10px); }
+    .title { font-family: 'Orbitron', sans-serif; color: #FFCE00; font-size: 28px; margin-bottom: 5px; letter-spacing: 2px; text-shadow: 0 0 15px rgba(255,206,0,0.4); }
+    .subtitle { color: #cccccc; font-size: 12px; margin-bottom: 20px; font-weight: 300; letter-spacing: 1px;}
+    .setup-input-group { margin-bottom: 15px; color: #ccc; font-size: 13px; text-align: center; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,206,0,0.2); }
+    .setup-input { width: 50px; background: #000; color: #FFCE00; border: 1px solid #FFCE00; border-radius: 4px; text-align: center; font-weight: bold; margin-left: 10px;}
+    .selector-row { display: flex; gap: 8px; margin-bottom: 20px; }
+    .mode-btn { flex: 1; background: rgba(255,255,255,0.05); color: #ccc; border: 1px solid rgba(255,206,0,0.3); border-radius: 6px; padding: 10px; cursor: pointer; font-family: 'Noto Sans KR', sans-serif; font-weight: bold; transition: 0.3s; font-size: 13px; }
+    .mode-btn.active { background: rgba(255,206,0,0.25); color: #FFCE00; border-color: #FFCE00; box-shadow: 0 0 15px rgba(255,206,0,0.3); }
+    .modern-btn { width: 100%; background: #FFCE00; color: #1F1F1F; border: none; border-radius: 4px; padding: 15px; font-weight: bold; font-size: 16px; cursor: pointer; text-transform: uppercase; font-family: 'Orbitron', sans-serif; transition: 0.3s; margin-top: 10px; }
+    .modern-btn:hover { background: #ffdf4d; box-shadow: 0 0 20px rgba(255,206,0,0.6); }
+    .hud { position: fixed; z-index: 5; font-family: 'Orbitron', sans-serif; color: white; pointer-events: none; text-shadow: 0 0 10px rgba(0,0,0,0.8); }
+    #stage-info { top: 20px; left: 50%; transform: translateX(-50%); font-size: 24px; color: #FFCE00; }
+    #btn-fs { position: fixed; top: 20px; left: 20px; z-index: 20; background: rgba(31,31,31,0.8); border: 1px solid #FFCE00; color: #FFCE00; border-radius: 8px; padding: 8px 15px; font-family: 'Orbitron', sans-serif; font-weight: bold; cursor: pointer; transition: 0.3s; display: none; pointer-events: auto;}
+    #btn-pause { position: fixed; top: 20px; right: 20px; z-index: 20; background: rgba(31,31,31,0.8); border: 1px solid #FFCE00; color: #FFCE00; border-radius: 8px; padding: 8px 15px; font-family: 'Orbitron', sans-serif; font-weight: bold; cursor: pointer; transition: 0.3s; display: none; pointer-events: auto;}
+    #hp-info { top: 65px; left: 20px; font-size: 20px; color: #ff4444; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; border: 1px solid rgba(255,68,68,0.3); font-family: 'Noto Sans KR';}
+    #gold-info { top: 65px; right: 20px; font-size: 20px; color: #FFCE00; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; border: 1px solid rgba(255,206,0,0.3);}
+    #turret-limit-info { top: 105px; right: 20px; font-size: 14px; color: #ccc; font-family: 'Noto Sans KR'; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px;}
+    #btn-limit-up { position: fixed; top: 140px; right: 20px; z-index: 10; background: rgba(0,0,0,0.5); border: 1px solid #FFCE00; color: #FFCE00; border-radius: 20px; padding: 5px 15px; font-family: 'Noto Sans KR', sans-serif; font-size: 12px; cursor: pointer; transition: 0.3s; display: none; pointer-events: auto;}
+    #dead-players-list { position: fixed; top: 180px; right: 20px; z-index: 10; display: flex; flex-direction: column; align-items: flex-end; pointer-events: none; }
+    #dead-players-list button { pointer-events: auto; }
+    #status-msg { top: 60px; left: 50%; transform: translateX(-50%); font-size: 16px; text-align: center; font-family: 'Noto Sans KR'; }
+    #controls-info { bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 14px; color: #ccc; font-family: 'Noto Sans KR'; background: rgba(0,0,0,0.6); padding: 5px 15px; border-radius: 10px;}
+    #skill-info { bottom: 80px; right: 20px; font-size: 16px; color: #cc44ff; font-family: 'Noto Sans KR'; font-weight: bold; background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 10px; border: 1px solid rgba(204,68,255,0.4); text-shadow: 0 0 10px #cc44ff;}
+    
+    .action-menu { display: none; position: absolute; z-index: 100; background: rgba(15,15,15,0.95); border: 1px solid #FFCE00; border-radius: 8px; padding: 12px; box-shadow: 0 0 20px rgba(255,206,0,0.3); transform: translate(-50%, -100%); margin-top: -15px;}
+    .build-btn { display: block; width: 100%; background: none; color: white; border: 1px solid #555; margin: 5px 0; padding: 8px 12px; cursor: pointer; font-family: 'Noto Sans KR'; transition: 0.2s; border-radius: 4px; font-size: 12px;}
+    .build-btn:hover { background: rgba(255,206,0,0.1); color:#FFCE00; border-color:#FFCE00;}
+    
+    #damage-flash { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 0, 0, 0.3); z-index: 80; pointer-events: none; box-shadow: inset 0 0 150px rgba(255,0,0,0.5); }
+    #dead-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 5, 5, 0.85); z-index: 200; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px); pointer-events: auto;}
+    .dead-title { font-family: 'Orbitron', sans-serif; font-size: 48px; color: #ff4444; margin-bottom: 10px; text-shadow: 0 0 20px rgba(255,68,68,0.8); letter-spacing: 5px; }
+    .dead-subtitle { font-family: 'Noto Sans KR', sans-serif; font-size: 16px; color: #ccc; margin-bottom: 30px; }
+    .revive-btn { background: #00ff88; color: #020204; border: none; padding: 15px 30px; font-size: 20px; font-family: 'Orbitron', sans-serif; font-weight: bold; cursor: pointer; border-radius: 8px; transition: 0.3s; box-shadow: 0 0 20px rgba(0,255,136,0.4); pointer-events: auto;}
+    
+    #ending-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 10, 5, 0.95); z-index: 300; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(10px); pointer-events: auto;}
+    .ending-title { font-family: 'Orbitron', sans-serif; font-size: 56px; color: #FFCE00; margin-bottom: 20px; text-shadow: 0 0 30px rgba(255,206,0,0.8); letter-spacing: 5px; text-align: center; }
+    .ending-subtitle { font-family: 'Noto Sans KR', sans-serif; font-size: 18px; color: #fff; margin-bottom: 40px; text-align: center; line-height: 1.6; }
+    #pause-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 90; justify-content: center; align-items: center; flex-direction: column; color: #FFCE00; font-family: 'Orbitron', sans-serif; font-size: 52px; text-shadow: 0 0 20px #FFCE00; backdrop-filter: blur(4px); }
+    .pause-sub { font-size: 16px; font-family: 'Noto Sans KR', sans-serif; color: #fff; margin-top: 15px; text-shadow: none; font-weight: 400; }
+
+    #dev-mode-panel { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 999; background: rgba(20, 0, 40, 0.95); padding: 30px; border: 2px solid #cc44ff; border-radius: 12px; color: white; text-align: center; box-shadow: 0 0 30px rgba(204,68,255,0.6); font-family: 'Noto Sans KR', sans-serif; max-height: 80vh; overflow-y: auto; pointer-events: auto;}
+    .dev-input { width: 60px; padding: 8px; font-size: 16px; font-weight: bold; text-align: center; border-radius: 6px; border: 1px solid #cc44ff; background: #000; color: #ffce00; margin: 0 10px; }
+    .dev-btn { background: #cc44ff; color: white; border: none; padding: 10px 20px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 6px; transition: 0.3s; margin-top: 15px; margin-right: 10px;}
+    .img-upload-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 5px; font-size: 12px;}
+    
+    #mobile-controls { display: none; position: fixed; bottom: 0; left: 0; width: 100%; height: 40%; z-index: 50; pointer-events: none; }
+    #joystick-zone { position: absolute; bottom: 20px; left: 20px; width: 150px; height: 150px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; pointer-events: auto; touch-action: none;}
+    #joystick-knob { position: absolute; top: 50px; left: 50px; width: 50px; height: 50px; background: rgba(255,206,0,0.5); border-radius: 50%; pointer-events: none; transform: translate(0, 0); }
+    #mobile-jump-btn { position: absolute; bottom: 40px; right: 30px; width: 80px; height: 80px; background: rgba(204,68,255,0.3); border: 2px solid rgba(204,68,255,0.6); color: white; font-family: 'Orbitron'; font-weight: bold; border-radius: 50%; pointer-events: auto; touch-action: none; display: flex; justify-content: center; align-items: center; box-shadow: 0 0 15px rgba(204,68,255,0.5);}
+
+    #chat-wrapper { position: fixed; bottom: 20px; left: 20px; z-index: 60; width: 300px; display: none; flex-direction: column; pointer-events: none;}
+    #chat-messages { height: 150px; overflow-y: auto; display: flex; flex-direction: column; justify-content: flex-end; margin-bottom: 5px; text-shadow: 1px 1px 2px #000; pointer-events: auto;}
+    .chat-msg { background: rgba(0,0,0,0.5); padding: 5px 8px; border-radius: 4px; margin-top: 2px; color: white; font-family: 'Noto Sans KR'; font-size: 13px; width: fit-content; word-break: break-all;}
+    #chat-input { background: rgba(0,0,0,0.7); border: 1px solid #FFCE00; color: #fff; padding: 8px; border-radius: 6px; font-family: 'Noto Sans KR'; outline: none; pointer-events: auto; transition: 0.3s;}
+    
+    @media (max-width: 768px) {
+      #controls-info { display: none !important; }
+      #btn-pause { top: 10px; right: 10px; padding: 5px 10px; font-size: 12px; }
+      #gold-info { top: 50px; right: 10px; font-size: 16px; }
+      #turret-limit-info { top: 85px; right: 10px; font-size: 12px; }
+      #btn-limit-up { top: 115px; right: 10px; padding: 5px 10px; font-size: 10px; }
+      #skill-info { bottom: 130px; right: 10px; font-size: 12px; }
+      #chat-wrapper { bottom: 180px; width: 200px; }
+    }
+  </style>
+</head>
+<body>
+
+<button id="btn-fs" onclick="toggleFullScreen()">⛶ FULL</button>
+<div id="hp-info" class="hud" style="display:none;"></div>
+<div id="stage-info" class="hud" style="display:none;">STAGE 1</div>
+<div id="status-msg" class="hud" style="display:none;"></div>
+<div id="controls-info" class="hud" style="display:none;">이동: 방향키 | 채팅: Enter | 일시정지: P | 개발자: Alt+A</div>
+<div id="skill-info" class="hud" style="display:none;"></div>
+<button id="btn-pause" onclick="togglePause()">⏸ PAUSE</button>
+<div id="gold-info" class="hud" style="display:none;">💰 0</div>
+<div id="turret-limit-info" class="hud" style="display:none;">포탑: 0 / 9</div>
+<button id="btn-limit-up" onclick="buyLimitUp()">한도 증가</button>
+
+<div id="dead-players-list"></div>
+<div id="damage-flash"></div>
+
+<div id="dead-screen">
+  <div class="dead-title">YOU DIED</div>
+  <div class="dead-subtitle">죽은 자는 전리품의 절반만 얻습니다. 다시 일어서겠습니까?</div>
+  <button class="revive-btn" onclick="buySelfRevive()">부활 (500G)</button>
+</div>
+
+<div id="ending-screen">
+  <div class="ending-title">UNIVERSE CONQUERED</div>
+  <div class="ending-subtitle">기나긴 100단계의 시련을 넘어, 마침내 우주의 평화를 되찾았습니다.<br>당신의 끈기와 통찰에 깊은 경의를 표합니다.</div>
+</div>
+
+<div id="pause-overlay">PAUSED<div class="pause-sub">'P' 키를 누르거나 버튼을 클릭하여 재개하세요</div></div>
+<div id="mobile-controls"><div id="joystick-zone"><div id="joystick-knob"></div></div><div id="mobile-jump-btn">JUMP</div></div>
+<div id="chat-wrapper"><div id="chat-messages"></div><input type="text" id="chat-input" placeholder="Enter를 눌러 채팅 입력..." autocomplete="off"></div>
+
+<div id="dev-mode-panel">
+  <h3 style="font-family: 'Orbitron', sans-serif; color: #ff66ff; margin-top: 0;">🛠 DEV MODE</h3>
+  <div style="margin-bottom: 15px; font-size: 14px; color: #00ff88; font-weight:bold; background: rgba(0,255,136,0.1); padding: 8px; border-radius: 6px;">
+    <label style="cursor: pointer;"><input type="checkbox" id="dev-invincible-cb" onchange="toggleDevInvincible(this.checked)"> 🛡️ 신의 권능 (무적 모드)</label>
+  </div>
+  <div style="margin-bottom: 20px; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+    <div style="font-size: 14px; color: #FFCE00; margin-bottom: 10px; font-weight:bold;">차원 도약 시스템</div>
+    <input type="number" id="dev-stage-input" class="dev-input" min="1" max="100" value="1"> <span style="font-size: 14px;">단계로</span>
+    <button class="dev-btn" style="padding: 5px 15px;" onclick="devJumpStage()">도약</button>
+  </div>
+  <div style="margin-bottom: 15px; font-size: 14px; color: #00ff88; font-weight:bold;">피조물 커스텀 (파이어베이스 연동)</div>
+  <div class="img-upload-row"><span>일반 몬스터</span><input type="file" accept="image/*" onchange="handleImg(event, 'normal')"></div>
+  <div class="img-upload-row"><span>2단 대쉬 몬스터</span><input type="file" accept="image/*" onchange="handleImg(event, 'double')"></div>
+  <div class="img-upload-row"><span>공성(브레이커)</span><input type="file" accept="image/*" onchange="handleImg(event, 'breaker')"></div>
+  <div class="img-upload-row"><span>미세 몬스터</span><input type="file" accept="image/*" onchange="handleImg(event, 'micro')"></div>
+  <div class="img-upload-row"><span>군단(Swarm)</span><input type="file" accept="image/*" onchange="handleImg(event, 'swarm')"></div>
+  <div class="img-upload-row"><span>거대 보스</span><input type="file" accept="image/*" onchange="handleImg(event, 'boss')"></div>
+  <div class="img-upload-row"><span>구속의 눈(레이저)</span><input type="file" accept="image/*" onchange="handleImg(event, 'laser')"></div>
+  <div class="img-upload-row"><span>인력의 폭군(자석)</span><input type="file" accept="image/*" onchange="handleImg(event, 'magnet')"></div>
+  <button class="dev-btn" style="background:#555; border:1px solid #777; width: 100%; margin-top: 10px;" onclick="closeDevMode()">닫기</button>
+</div>
+
+<div id="build-menu" class="action-menu">
+  <div style="color:#aaa; font-size:10px; margin-bottom:5px; text-align:center;">포탑 건설</div>
+  <button class="build-btn" onclick="buyTurret(0)">장거리 대포 (10G)</button>
+  <button class="build-btn" onclick="buyTurret(1)">단거리 화살 (5G)</button>
+  <button class="build-btn" onclick="buyTurret(2)">전기 포탑 (15G)</button>
+  <button class="build-btn" onclick="closeMenus()" style="border-color: #ff4444; margin-top:10px;">취소</button>
+</div>
+<div id="upgrade-menu" class="action-menu">
+  <div style="color:#FFCE00; font-size:11px; margin-bottom:5px; text-align:center;">포탑 정비</div>
+  <button class="build-btn" id="btn-upgrade" onclick="upgradeTurret()">레벨업</button>
+  <button class="build-btn" onclick="sellTurret()" style="border-color: #88aaff;">철거 (비용 반환)</button>
+  <button class="build-btn" onclick="closeMenus()" style="border-color: #ff4444; margin-top:10px;">취소</button>
+</div>
+
+<div id="ui-container">
+  <div class="glass-panel" id="setup-panel">
+    <div class="title">PEANUT COLISEUM</div><div class="subtitle">THE COSMIC BULLFIGHT</div>
+    <div class="setup-input-group">👨‍🚀 <b>참여 인원 설정:</b> <input type="number" id="player-count" class="setup-input" value="8" min="1" max="8"> 명</div>
+    <div class="selector-row"><button id="btn-coop" class="mode-btn active" onclick="setMode('coop')">CO-OP (협동)</button><button id="btn-solo" class="mode-btn" onclick="setMode('solo')">SOLO (생존)</button></div>
+    <button class="modern-btn" onclick="startColiseum()">ENTER COLISEUM</button>
+  </div>
+</div>
+
+<script>
+// 💡 파이어베이스 설정 (실제 프로젝트 키값으로 변경 필요)
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY", authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID", storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "123456789", appId: "1:123456789:web:abcdefg"
+};
+// 파이어베이스 사용 시 아래 주석 해제 (1/2)
+// firebase.initializeApp(firebaseConfig);
+// const db = firebase.firestore();
+// const storage = firebase.storage();
+
+// 💡 멀티플레이(Socket.io) 전역 객체
+let socket;
+let myPlayerId = null;
+let isHost = true; // 싱글 환경에서는 기본 방장
+let remotePlayers = {};
+
+function initSocket() {
+  if (typeof io !== 'undefined') {
+    socket = io();
+    socket.on('init', data => { myPlayerId = data.id; isHost = data.isHost; });
+    socket.on('becomeHost', () => { isHost = true; });
+    socket.on('updateState', state => {
+       // 방장이 보낸 몬스터/포탑 상태를 렌더링만 수행하도록 덮어씌움 (구현 예시 생략)
+    });
+    socket.on('remoteInput', data => {
+       // 방장일 경우 타인의 조이스틱/키보드 값을 적용
+       let rp = players.find(p => p.socketId === data.id);
+       if(rp) { rp.keys = data.input.keys; rp.joy = data.input.joy; }
+    });
+  }
+}
+
+// 💡 별 그리기 함수
+function drawStar(x, y, r1, r2, npoints) {
+  let angle = TWO_PI / npoints; let halfAngle = angle / 2.0; beginShape();
+  for (let a = 0; a < TWO_PI; a += angle) { let sx = x + cos(a) * r2; let sy = y + sin(a) * r2; vertex(sx, sy); sx = x + cos(a + halfAngle) * r1; sy = y + sin(a + halfAngle) * r1; vertex(sx, sy); } endShape(CLOSE);
+}
+
+let gameState = 'SETUP', isPaused = false, gameMode = 'coop', coliseumCanvas, players = [];
+let monsters = [], microMonsters = [], doubleDashMonsters = [], breakerMonsters = [], swarmMonsters = [], bossMonsters = [], laserMonsters = [], magnetMonsters = [];
+let enemyLasers = [], bossMissiles = [], items = [], floatingTexts = [], slowZones = [];
+let electricTraps = [], electricTrapSeqCount = 0, electricTrapSeqTimer = 0;
+let rings = [[], [], []], currentRingAngles = [0, 0, 0], targetRingAngles = [0, 0, 0];
+let pads = [], vents = [], ventActiveTimers = {0: 0, 1: 0}; 
+const SHOCK_SLOW_RATES = [0, 0.25, 0.35, 0.40, 0.45, 0.50]; 
+let globalTurretBoostTimer = 0, globalMonsterSlowTimer = 0;
+let slotsPerRing = 40, anglePerSlot = 0, projectiles = [], particles = [], stage = 1, prepTimer = 0, maxPlayers = 8;
+let arenaRadius = 700, cageRadius = 100, camX = 0, camY = 0, camScale = 0.45, camShake = 0, selectedSlot = null; 
+
+let customImgs = { normal: null, double: null, breaker: null, micro: null, swarm: null, boss: null, laser: null, magnet: null };
+let devInvincible = false;
+
+function toggleDevInvincible(val) { devInvincible = val; }
+function handleImg(e, type) { 
+  let file = e.target.files[0]; if (!file) return;
+  // Firebase 주석 해제 시 (2/2)
+  /*
+  let storageRef = storage.ref('monster_skins/' + type + '_' + Date.now()); let uploadTask = storageRef.put(file);
+  createFloatingText(windowWidth/2, windowHeight/2, "스킨 저장 중...", '#cc44ff', 24);
+  uploadTask.on('state_changed', null, err=>console.error(err), () => {
+    uploadTask.snapshot.ref.getDownloadURL().then((url) => {
+      db.collection("coliseum").doc("skins").set({ [type]: url }, { merge: true });
+      loadImage(url, img => { customImgs[type] = img; createFloatingText(windowWidth/2, windowHeight/2, "각인 완료!", '#00ff88', 24); });
+    });
+  });
+  */
+  let reader = new FileReader(); reader.onload = function(f) { loadImage(f.target.result, img => { customImgs[type] = img; createFloatingText(windowWidth/2, windowHeight/2, "스킨 로드 완료!", '#00ff88', 28); }); }; reader.readAsDataURL(file); 
+}
+function loadSkinsFromFirebase() { 
+  /*
+  db.collection("coliseum").doc("skins").get().then((doc) => {
+    if (doc.exists) { let data = doc.data(); for (let t in data) { if (data[t]) loadImage(data[t], img => { customImgs[t] = img; }); } }
+  });
+  */
+}
+
+let audioCtx, lastShootSound = 0, lastHitSound = 0;
+function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); }
+function playSound(type) {
+  if (!audioCtx) return;
+  try {
+    let now = audioCtx.currentTime; let osc = audioCtx.createOscillator(); let gain = audioCtx.createGain(); osc.connect(gain); gain.connect(audioCtx.destination);
+    if (type === 'shoot') { if (now - lastShootSound < 0.05) return; lastShootSound = now; osc.type = 'square'; osc.frequency.setValueAtTime(400, now); osc.frequency.exponentialRampToValueAtTime(100, now + 0.1); gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1); osc.start(now); osc.stop(now + 0.1); } 
+    else if (type === 'hit') { if (now - lastHitSound < 0.05) return; lastHitSound = now; osc.type = 'sawtooth'; osc.frequency.setValueAtTime(200, now); osc.frequency.exponentialRampToValueAtTime(50, now + 0.1); gain.gain.setValueAtTime(0.05, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1); osc.start(now); osc.stop(now + 0.1); } 
+    else if (type === 'build') { osc.type = 'sine'; osc.frequency.setValueAtTime(600, now); osc.frequency.setValueAtTime(800, now + 0.05); gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now + 0.1); osc.start(now); osc.stop(now + 0.1); } 
+    else if (type === 'jump') { osc.type = 'sine'; osc.frequency.setValueAtTime(300, now); osc.frequency.exponentialRampToValueAtTime(600, now + 0.3); gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now + 0.3); osc.start(now); osc.stop(now + 0.3); } 
+    else if (type === 'explosion') { osc.type = 'square'; osc.frequency.setValueAtTime(100, now); osc.frequency.exponentialRampToValueAtTime(20, now + 0.4); gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4); osc.start(now); osc.stop(now + 0.4); } 
+    else if (type === 'laser') { osc.type = 'sawtooth'; osc.frequency.setValueAtTime(800, now); osc.frequency.linearRampToValueAtTime(200, now + 0.3); gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3); osc.start(now); osc.stop(now + 0.3); }
+  } catch (e) {}
+}
+
+let keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false, Space: false };
+let secretBuffer = "", virtualJoy = { active: false, dx: 0, dy: 0, originX: 0, originY: 0 }, isTouchDevice = false;
+
+window.addEventListener('keydown', e => { 
+  if(document.activeElement && document.activeElement.id === 'chat-input') { if(e.code === 'Enter') handleChatSubmit(); return; }
+  if(keys.hasOwnProperty(e.code)) { keys[e.code] = true; if(e.code === 'Space') { e.preventDefault(); if(document.activeElement) document.activeElement.blur(); } }
+  if(e.code === 'KeyP') togglePause(); if(e.code === 'Enter') { document.getElementById('chat-input').focus(); e.preventDefault(); }
+  if(e.altKey && (e.code === 'KeyA' || e.key === 'a' || e.key === 'A')) {
+    e.preventDefault(); let pwd = prompt("🛠 개발자 비밀번호를 입력하세요:");
+    if (pwd === "zmfflq1!@#") document.getElementById('dev-mode-panel').style.display = 'block'; else if (pwd !== null) alert("비밀번호가 틀렸습니다.");
+  }
+});
+window.addEventListener('keyup', e => { if(keys.hasOwnProperty(e.code)) keys[e.code] = false; });
+window.addEventListener('touchstart', function() { isTouchDevice = true; }, {once: true});
+
+function initMobileControls() {
+  if (!isTouchDevice && window.innerWidth > 768) return;
+  document.getElementById('mobile-controls').style.display = 'block';
+  let joyZone = document.getElementById('joystick-zone'), joyKnob = document.getElementById('joystick-knob'), jumpBtn = document.getElementById('mobile-jump-btn');
+  joyZone.addEventListener('touchstart', e => { e.preventDefault(); let t = e.changedTouches[0]; let r = joyZone.getBoundingClientRect(); virtualJoy.active = true; virtualJoy.originX = r.left + r.width/2; virtualJoy.originY = r.top + r.height/2; updateJoystick(t.clientX, t.clientY, joyKnob); });
+  joyZone.addEventListener('touchmove', e => { e.preventDefault(); if(virtualJoy.active) updateJoystick(e.changedTouches[0].clientX, e.changedTouches[0].clientY, joyKnob); });
+  joyZone.addEventListener('touchend', e => { e.preventDefault(); virtualJoy.active = false; virtualJoy.dx = 0; virtualJoy.dy = 0; joyKnob.style.transform = `translate(0px, 0px)`; });
+  jumpBtn.addEventListener('touchstart', e => { e.preventDefault(); keys.Space = true; jumpBtn.style.transform = 'scale(0.9)'; });
+  jumpBtn.addEventListener('touchend', e => { e.preventDefault(); keys.Space = false; jumpBtn.style.transform = 'scale(1)'; });
+}
+function updateJoystick(cx, cy, knob) {
+  let dx = cx - virtualJoy.originX, dy = cy - virtualJoy.originY, dist = Math.sqrt(dx*dx + dy*dy), maxDist = 50; 
+  if(dist > maxDist) { dx = (dx/dist)*maxDist; dy = (dy/dist)*maxDist; }
+  knob.style.transform = `translate(${dx}px, ${dy}px)`; virtualJoy.dx = dx / maxDist; virtualJoy.dy = dy / maxDist;
+}
+
+let chatMessages = [];
+function handleChatSubmit() { let input = document.getElementById('chat-input'), msg = input.value.trim(); if(msg !== "") { chatMessages.push(`[P1] ${msg}`); if(chatMessages.length > 5) chatMessages.shift(); renderChat(); createFloatingText(players[0].x, players[0].y - 50, msg, '#ffffff', 20); } input.value = ""; input.blur(); }
+function renderChat() { let c = document.getElementById('chat-messages'); c.innerHTML = ''; chatMessages.forEach(m => { let div = document.createElement('div'); div.className = 'chat-msg'; div.innerText = m; c.appendChild(div); }); c.scrollTop = c.scrollHeight; }
+function devJumpStage() { let target = parseInt(document.getElementById('dev-stage-input').value); if (target >= 1 && target <= 100) { stage = target; document.getElementById('dev-mode-panel').style.display = 'none'; if(gameState === 'PLAYING' || gameState === 'PREP') startPrepPhase(); } else { alert("1에서 100 사이의 단계를 입력해주세요."); } }
+function closeDevMode() { document.getElementById('dev-mode-panel').style.display = 'none'; }
+function toggleFullScreen() { if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(err=>{}); } else { if (document.exitFullscreen) document.exitFullscreen(); } }
+function togglePause() { if (gameState === 'SETUP' || players[0]?.isDead) return; isPaused = !isPaused; document.getElementById('pause-overlay').style.display = isPaused ? 'flex' : 'none'; document.getElementById('btn-pause').innerText = isPaused ? '▶ RESUME' : '⏸ PAUSE'; if (isPaused) closeMenus(); }
+function triggerShake(i) { camShake = max(camShake, i); }
+function setMode(mode) { gameMode = mode; document.getElementById('btn-coop').classList.toggle('active', mode === 'coop'); document.getElementById('btn-solo').classList.toggle('active', mode === 'solo'); }
+
+function setup() { coliseumCanvas = createCanvas(windowWidth, windowHeight); coliseumCanvas.elt.style.display = 'none'; colorMode(HSB, 360, 100, 100, 100); initSocket(); loadSkinsFromFirebase(); }
+function windowResized() { resizeCanvas(windowWidth, windowHeight); }
+
+function startColiseum() {
+  initAudio(); initMobileControls();
+  let customPlayers = parseInt(document.getElementById('player-count').value); if (isNaN(customPlayers) || customPlayers < 1) customPlayers = 1; if (customPlayers > 8) customPlayers = 8; maxPlayers = customPlayers;
+  ['setup-panel','build-menu','upgrade-menu'].forEach(id => document.getElementById(id).style.display = 'none');
+  ['stage-info','status-msg','gold-info','hp-info','turret-limit-info','controls-info','btn-pause','btn-limit-up','btn-fs'].forEach(id => document.getElementById(id).style.display = 'block');
+  document.getElementById('chat-wrapper').style.display = 'flex'; coliseumCanvas.elt.style.display = 'block';
+  
+  players = []; for(let i=0; i<maxPlayers; i++) players.push(new Player(i === 0, i));
+  slotsPerRing = maxPlayers * 5; anglePerSlot = TWO_PI / slotsPerRing; rings = [[], [], []]; currentRingAngles = [0, 0, 0]; targetRingAngles = [0, 0, 0];
+  let ringRadii = [750, 850, 950]; let ringWidth = 100;
+  for(let r=0; r<3; r++) { for(let s=0; s<slotsPerRing; s++) { rings[r].push(new TurretSlot(r, s, ringRadii[r], ringWidth)); } }
+  vents = []; for(let i=0; i<6; i++) { let a1 = (TWO_PI / 6) * i + PI/6; vents.push({x: cos(a1)*300, y: sin(a1)*300, type: 0}); let a2 = (TWO_PI / 6) * i; vents.push({x: cos(a2)*500, y: sin(a2)*500, type: 1}); }
+  stage = 1; startPrepPhase();
+}
+
+function startPrepPhase() {
+  gameState = 'PREP'; prepTimer = 10 * 60; projectiles = []; enemyLasers = []; bossMissiles = []; monsters = []; microMonsters = []; breakerMonsters = []; doubleDashMonsters = []; swarmMonsters = []; bossMonsters = []; laserMonsters = []; magnetMonsters = []; slowZones = []; items = []; pads = []; floatingTexts = []; electricTraps = []; electricTrapSeqCount = 0; electricTrapSeqTimer = 0;
+  
+  if (stage >= 10) { let padAngle1 = random(TWO_PI); pads.push(new Pad(cos(padAngle1)*200, sin(padAngle1)*200, 0)); if (stage >= 20) { let padAngle2 = padAngle1 + PI; pads.push(new Pad(cos(padAngle2)*200, sin(padAngle2)*200, 1)); } }
+  if (stage > 1) { let baseShift = 6; targetRingAngles[0] += baseShift * 2 * anglePerSlot; targetRingAngles[1] -= baseShift * 1.5 * anglePerSlot; targetRingAngles[2] += baseShift * 0.8 * anglePerSlot; triggerShake(3); }
+  
+  let aliveCount = players.filter(p => !p.isDead).length; if (aliveCount === 0) aliveCount = 1; 
+  let isBossStage = (stage % 10 === 0), isSwarmStage = (stage % 5 === 4 || stage % 5 === 9) && !isBossStage;
+  let numMonsters = 1; if (stage >= 10 && stage < 20) numMonsters = 2; else if (stage >= 20) numMonsters = 3;
+  let totalHp = 150 * aliveCount * stage, singleMonsterHp = totalHp / numMonsters;
+  let msg = `STAGE ${stage} 준비 중입니다.`;
+
+  if (isBossStage) { 
+      msg = "⚠️ 경고: 거대한 심연, 보스가 출현합니다!"; 
+      bossMonsters.push(new BossMonster(0, 0, totalHp * 1.0, 0)); 
+  } 
+  else if (isSwarmStage) { msg = "⚠️ 경고: 수많은 군단이 몰려옵니다! 물량전에 대비하세요!"; let swarmCount = numMonsters * 5 + Math.floor(stage / 2); for(let i=0; i<swarmCount; i++) { let angle = random(TWO_PI); let swarmSpeed = map(min(stage, 100), 1, 100, 5.0, 9.0); swarmMonsters.push(new SwarmMonster(cos(angle)*40, sin(angle)*40, singleMonsterHp * 0.1, swarmSpeed)); } } 
+  else {
+      for(let i=0; i<numMonsters; i++) { let angle = (TWO_PI / numMonsters) * i; if (stage >= 15 && i === 0) doubleDashMonsters.push(new DoubleDashMonster(cos(angle)*40, sin(angle)*40, singleMonsterHp, i)); else monsters.push(new Monster(cos(angle)*40, sin(angle)*40, singleMonsterHp, i)); if (stage >= 5) { let microSpeed = map(min(stage, 30), 5, 30, 2.0, 6.0); microMonsters.push(new MicroMonster(cos(angle)*60, sin(angle)*60, singleMonsterHp * 0.15, microSpeed)); } }
+      if (stage >= 20) { let numBreakers = floor((stage - 10) / 10); for (let i = 0; i < numBreakers; i++) { let angle = random(TWO_PI); breakerMonsters.push(new BreakerMonster(cos(angle)*40, sin(angle)*40, singleMonsterHp * 1.5, i)); } }
+      if (stage >= 35) { let numLaser = floor((stage - 25) / 10); for(let i=0; i<numLaser; i++) laserMonsters.push(new LaserSlowMonster(cos(random(TWO_PI))*40, sin(random(TWO_PI))*40, singleMonsterHp*1.2, i)); }
+      if (stage >= 45) { let numMagnet = floor((stage - 35) / 10); for(let i=0; i<numMagnet; i++) magnetMonsters.push(new MagnetMonster(cos(random(TWO_PI))*40, sin(random(TWO_PI))*40, singleMonsterHp*1.5, i)); }
+      if (stage === 5) msg = "경고: 몬스터가 돌진을 학습하고 미세 몬스터가 등장합니다!"; else if (stage === 10) msg = "업화의 패드가 활성화되었습니다. 몬스터가 2마리로 증가합니다."; else if (stage === 15) msg = "경고: 변칙적인 2단 대쉬 몬스터가 합류합니다!"; else if (stage === 20) msg = "경고: 파괴의 광선을 쏘는 브레이커가 등장합니다!"; else if (stage === 25) msg = "경고: 시공간을 왜곡하는 슬로우 존이 발생합니다!"; else if (stage === 30) msg = "경고: 뇌우(전기 트랩 비)가 내리기 시작합니다!"; else if (stage === 35) msg = "경고: 구속의 눈(초록 레이저)이 등장합니다!"; else if (stage === 45) msg = "경고: 인력의 폭군(말굽자석)이 등장합니다!"; else if (stage > 1) msg = "지형이 회전합니다. 진지를 재정비하세요.";
+  }
+  document.getElementById('stage-info').innerText = `STAGE ${stage}`; document.getElementById('status-msg').innerText = msg; updateHUD();
+}
+
+function startPlayingPhase() { gameState = 'PLAYING'; document.getElementById('status-msg').innerText = "전투 시작!"; setTimeout(() => document.getElementById('status-msg').innerText = "", 3000); closeMenus(); }
+
+function updateDeadPlayersList() {
+  let listDiv = document.getElementById('dead-players-list'); listDiv.innerHTML = ''; if (!players || players.length === 0) return;
+  let localPlayer = players[0]; let deadTeammates = players.filter(p => p.isDead && p !== localPlayer);
+  if (deadTeammates.length > 0) {
+    let title = document.createElement('div'); title.style.color = '#ccc'; title.style.fontFamily = 'Noto Sans KR'; title.style.fontSize = '12px'; title.style.marginBottom = '5px'; title.innerText = '관전 중인 동료 (부활: 700G)'; listDiv.appendChild(title);
+    deadTeammates.forEach(p => {
+      let row = document.createElement('div'); row.style.marginBottom = '5px'; row.style.display = 'flex'; row.style.alignItems = 'center'; row.style.gap = '10px';
+      let name = document.createElement('span'); name.innerText = `P${p.id+1}`; name.style.color = '#fff'; name.style.fontFamily = 'Orbitron'; name.style.fontSize = '14px'; name.style.fontWeight = 'bold';
+      let btn = document.createElement('button'); btn.innerText = '부활'; btn.style.background = '#00ff88'; btn.style.color = '#020204'; btn.style.border = 'none'; btn.style.borderRadius = '4px'; btn.style.cursor = 'pointer'; btn.style.fontFamily = 'Noto Sans KR'; btn.style.fontSize = '11px'; btn.style.padding = '4px 8px'; btn.style.fontWeight = 'bold';
+      if (localPlayer.gold >= 700 && !localPlayer.isDead) { btn.style.opacity = '1.0'; } else { btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; }
+      btn.onclick = () => reviveTeammate(p.id); row.appendChild(name); row.appendChild(btn); listDiv.appendChild(row);
+    });
+  }
+}
+
+function updateHUD() {
+  if (!players || players.length === 0) return; let localPlayer = players[0];
+  document.getElementById('gold-info').innerText = `💰 ${localPlayer.gold}`;
+  let myTurretsCount = 0; for(let r=0; r<3; r++) myTurretsCount += rings[r].filter(s => s.hasTurret && s.owner === localPlayer).length;
+  document.getElementById('turret-limit-info').innerText = `포탑: ${myTurretsCount} / ${localPlayer.maxTurrets}`;
+  let limitBtn = document.getElementById('btn-limit-up'); let upgradeCost = 300 * (localPlayer.maxTurrets - 8); limitBtn.innerText = `한도 증가 (${upgradeCost}G)`;
+  if (localPlayer.gold >= upgradeCost && !localPlayer.isDead) { limitBtn.style.borderColor = '#FFCE00'; limitBtn.style.color = '#FFCE00'; limitBtn.style.opacity = '1.0'; limitBtn.style.pointerEvents = 'auto'; } else { limitBtn.style.borderColor = '#555'; limitBtn.style.color = '#aaa'; limitBtn.style.opacity = '0.5'; limitBtn.style.pointerEvents = 'none'; }
+  let hpStr = ""; for(let i=0; i<localPlayer.maxHp; i++) hpStr += (i < localPlayer.hp) ? "❤️" : "🖤"; if (localPlayer.isDead) hpStr = "☠️ 관전 모드"; document.getElementById('hp-info').innerText = hpStr;
+  let skillHUD = document.getElementById('skill-info');
+  if (localPlayer.jumpCharges > 0 && !localPlayer.isDead) { skillHUD.style.display = 'block'; skillHUD.innerText = `🚀 도약(SPACE): ${localPlayer.jumpCharges}회`; } else { skillHUD.style.display = 'none'; }
+  updateDeadPlayersList();
+}
+
+function buyLimitUp() { if (gameState === 'SETUP' || isPaused || !players || !players[0] || players[0].isDead) return; let p = players[0]; let cost = 300 * (p.maxTurrets - 8); if (p.gold >= cost) { p.gold -= cost; p.maxTurrets++; playSound('build'); createFloatingText(p.x, p.y - 40, "건설 한도 +1 증가!", '#FFCE00', 28); updateHUD(); } else { alert("골드가 부족합니다!"); } }
+function buySelfRevive() { if (!players || !players[0] || !players[0].isDead) return; let p = players[0]; if (p.gold >= 500) { p.gold -= 500; p.isDead = false; p.hp = p.maxHp; p.invincibility = 180; playSound('jump'); document.getElementById('dead-screen').style.display = 'none'; createParticles(p.x, p.y, color(120, 100, 100), 50); updateHUD(); } else { alert("골드가 부족합니다!"); } }
+function reviveTeammate(targetId) { let localPlayer = players[0]; if (localPlayer.isDead) { alert("자신이 쓰러진 상태에서는 동료를 살릴 수 없습니다."); return; } if (localPlayer.gold >= 700) { let target = players.find(p => p.id === targetId); if (target && target.isDead) { localPlayer.gold -= 700; target.isDead = false; target.hp = target.maxHp; target.invincibility = 180; playSound('jump'); createParticles(target.x, target.y, color(120, 100, 100), 50); createFloatingText(target.x, target.y - 30, "기적의 부활!", '#00ff88', 28); updateHUD(); } } else { alert("골드가 부족합니다!"); } }
+function spawnElectricTrap() { let maxTries = 10; let tx, ty; let trapR = 70; let valid = false; while(maxTries > 0) { let a = random(TWO_PI); let d = random(0, arenaRadius - trapR); tx = cos(a) * d; ty = sin(a) * d; valid = true; for (let et of electricTraps) { let distSq = (tx-et.x)*(tx-et.x) + (ty-et.y)*(ty-et.y); if (distSq < (trapR*2)*(trapR*2)) { valid = false; break; } } if (valid) break; maxTries--; } electricTraps.push(new ElectricTrap(tx, ty, trapR)); }
+
+function draw() {
+  if (gameState === 'SETUP') return;
+  background(240, 20, 8); camScale = lerp(camScale, 0.38, 0.1); 
+  let sx = 0, sy = 0; if (!isPaused) { sx = random(-camShake, camShake); sy = random(-camShake, camShake); camShake *= 0.8; }
+  translate(width/2 + sx, height/2 + sy); scale(camScale); drawArena();
+  let mx = (mouseX - width/2) / camScale; let my = (mouseY - height/2) / camScale;
+
+  if (!isPaused && gameState !== 'ENDING') {
+    if (globalTurretBoostTimer > 0) globalTurretBoostTimer--; if (globalMonsterSlowTimer > 0) globalMonsterSlowTimer--;
+    if (gameState === 'PLAYING' && frameCount % 600 === 0 && items.length < 4) { let a = random(TWO_PI); let d = random(150, arenaRadius - 50); let rnd = random(); let typeToSpawn = 0; if (rnd < 0.20) typeToSpawn = 0; else if (rnd < 0.40) typeToSpawn = 1; else if (rnd < 0.60) typeToSpawn = 2; else if (rnd < 0.75) typeToSpawn = 3; else if (rnd < 0.90) typeToSpawn = 5; else typeToSpawn = 4; items.push(new Item(cos(a)*d, sin(a)*d, typeToSpawn)); }
+    if (stage >= 25 && gameState === 'PLAYING' && frameCount % 400 === 0) { slowZones.push(new SlowZone()); }
+    if (stage >= 30 && gameState === 'PLAYING') { if (frameCount % 900 === 0 && electricTrapSeqCount === 0) { electricTrapSeqCount = 7; electricTrapSeqTimer = 0; } if (electricTrapSeqCount > 0) { electricTrapSeqTimer--; if (electricTrapSeqTimer <= 0) { spawnElectricTrap(); electricTrapSeqCount--; electricTrapSeqTimer = 60; } } }
+    for(let r=0; r<3; r++) { currentRingAngles[r] += (targetRingAngles[r] - currentRingAngles[r]) * 0.015; for(let slot of rings[r]) slot.updatePosition(currentRingAngles[r]); }
+    if (ventActiveTimers[0] > 0) ventActiveTimers[0]--; if (ventActiveTimers[1] > 0) ventActiveTimers[1]--;
+    
+    // 💡 [통신] 방장일 경우 우주의 정보를 전송 (구현부 확장시 활성화)
+    if (isHost && socket && typeof socket.emit === 'function') {
+        // socket.emit('syncState', { monsters: monsters, players: players });
+    }
+  }
+
+  let allEnemies = monsters.concat(microMonsters, breakerMonsters, doubleDashMonsters, swarmMonsters, bossMonsters, laserMonsters, magnetMonsters);
+
+  for (let i = electricTraps.length - 1; i >= 0; i--) { if (!isPaused && gameState !== 'ENDING') electricTraps[i].update(players); electricTraps[i].display(); if (electricTraps[i].state === 2) electricTraps.splice(i, 1); }
+  for (let i = slowZones.length - 1; i >= 0; i--) { if (!isPaused && gameState !== 'ENDING') slowZones[i].update(); slowZones[i].display(); if (slowZones[i].state === 2) slowZones.splice(i, 1); }
+
+  for (let v of vents) {
+    if (v.type === 0 && stage < 10) continue; if (v.type === 1 && stage < 20) continue;
+    let isActive = ventActiveTimers[v.type] > 0;
+    push(); translate(v.x, v.y); strokeWeight(2); stroke(0, 0, 30); fill(v.type === 0 ? color(0, 80, 20, 50) : color(200, 80, 20, 50)); ellipse(0, 0, 30); fill(0, 0, 10); ellipse(0, 0, 15); 
+    if (isActive) {
+      let radius = v.type === 0 ? 120 : 180; drawingContext.shadowBlur = 30; drawingContext.shadowColor = v.type === 0 ? '#ff5500' : '#00aaff'; noStroke(); fill(v.type === 0 ? color(10, 100, 50, 40) : color(200, 100, 80, 40)); ellipse(0, 0, radius * 2); drawingContext.shadowBlur = 0;
+      if (!isPaused && gameState !== 'ENDING') {
+        if(frameCount % 3 === 0) createParticles(v.x, v.y, v.type === 0 ? color(10, 100, 80) : color(200, 30, 100), 5);
+        for(let m of allEnemies) { let dx = v.x - m.x; let dy = v.y - m.y; if (dx*dx + dy*dy < radius*radius) { if (v.type === 0) m.burnTimer = 120; if (v.type === 1) m.freezeTimer = 180; } }
+      }
+    } pop();
+  }
+
+  for(let pad of pads) { if (!isPaused && gameState === 'PLAYING') pad.update(players); pad.display(); }
+  for(let i = items.length-1; i >= 0; i--) items[i].display();
+
+  for(let r=0; r<3; r++) {
+    for(let slot of rings[r]) {
+      let isHovered = false; let bMenu = document.getElementById('build-menu').style.display === 'block'; let uMenu = document.getElementById('upgrade-menu').style.display === 'block';
+      if (!isPaused && !bMenu && !uMenu && gameState !== 'ENDING') {
+        let dSq = mx*mx + my*my; let a = atan2(my, mx); if (a < 0) a += TWO_PI; let unrotatedA = (a - currentRingAngles[r]) % TWO_PI; if (unrotatedA < 0) unrotatedA += TWO_PI; unrotatedA %= TWO_PI;
+        let baseStart = slot.indexInRing * anglePerSlot; let baseEnd = baseStart + anglePerSlot;
+        if (dSq >= slot.radius*slot.radius && dSq <= (slot.radius + slot.width)*(slot.radius + slot.width) && unrotatedA >= baseStart && unrotatedA <= baseEnd) isHovered = true;
+      }
+      slot.display(isHovered);
+      if (!isPaused && gameState === 'PLAYING' && (isHost || slot.owner === players[0])) slot.updateTurret(allEnemies);
+    }
+  }
+  
+  for(let i = projectiles.length-1; i >= 0; i--) {
+    if (!isPaused && gameState !== 'ENDING') projectiles[i].update(); projectiles[i].display();
+    if (!isPaused && gameState !== 'ENDING') { if (projectiles[i].checkCollision()) projectiles.splice(i, 1); else if (projectiles[i].life <= 0) projectiles.splice(i, 1); }
+  }
+  for(let i = enemyLasers.length-1; i >= 0; i--) {
+    if (!isPaused && gameState !== 'ENDING') enemyLasers[i].update(); enemyLasers[i].display();
+    if (!isPaused && gameState !== 'ENDING') { if (enemyLasers[i].checkCollision(players, rings)) enemyLasers.splice(i, 1); else if (enemyLasers[i].life <= 0) enemyLasers.splice(i, 1); }
+  }
+  for(let i = bossMissiles.length-1; i >= 0; i--) {
+    if (!isPaused && gameState !== 'ENDING') bossMissiles[i].update(); bossMissiles[i].display();
+    if (!isPaused && gameState !== 'ENDING') { if (bossMissiles[i].checkCollision(players, rings)) bossMissiles.splice(i, 1); else if (bossMissiles[i].life <= 0) bossMissiles.splice(i, 1); }
+  }
+  
+  for(let p of players) { 
+      if (!isPaused) p.update(items, allEnemies, slowZones); p.display(); 
+      // 💡 [통신] 내 조작값을 방장에게 전송
+      if (p.isReal && socket && typeof socket.emit === 'function') {
+          socket.emit('playerInput', { keys: keys, joy: virtualJoy });
+      }
+  }
+  
+  function handleMonsterArray(arr, rewardBase) {
+    for(let i = arr.length-1; i >= 0; i--) {
+      if(!isPaused && gameState === 'PLAYING') arr[i].update(players, allEnemies); arr[i].display();
+      if(!isPaused && gameState === 'PLAYING' && arr[i].hp <= 0) {
+        playSound('hit'); for(let p of players) { let reward = rewardBase + Math.floor(stage * 0.5); if(!p.isDead) p.gold += reward; else p.gold += Math.floor(reward / 2); }
+        createParticles(arr[i].x, arr[i].y, color(120, 100, 100), 40); arr.splice(i, 1); updateHUD();
+      }
+    }
+  }
+
+  if (gameState === 'PLAYING') {
+    handleMonsterArray(monsters, 15); handleMonsterArray(doubleDashMonsters, 20); handleMonsterArray(microMonsters, 5); 
+    for(let i = breakerMonsters.length-1; i >= 0; i--) {
+      if(!isPaused) breakerMonsters[i].update(players, allEnemies); breakerMonsters[i].display();
+      if(!isPaused && breakerMonsters[i].hp <= 0) { playSound('explosion'); for(let p of players) { let reward = 30 + Math.floor(stage * 0.5); if(!p.isDead) p.gold += reward; else p.gold += Math.floor(reward / 2); } createParticles(breakerMonsters[i].x, breakerMonsters[i].y, color(30, 80, 50), 70); breakerMonsters.splice(i, 1); updateHUD(); }
+    }
+    for(let i = swarmMonsters.length-1; i >= 0; i--) {
+      if(!isPaused) swarmMonsters[i].update(players, allEnemies); swarmMonsters[i].display();
+      if(!isPaused && swarmMonsters[i].hp <= 0) { for(let p of players) if(!p.isDead) p.gold += 2 + Math.floor(stage/10); createParticles(swarmMonsters[i].x, swarmMonsters[i].y, color(60, 100, 50), 15); swarmMonsters.splice(i, 1); updateHUD(); }
+    }
+    for(let i = bossMonsters.length-1; i >= 0; i--) {
+      if(!isPaused) bossMonsters[i].update(players, allEnemies); bossMonsters[i].display();
+      if(!isPaused && bossMonsters[i].hp <= 0) { playSound('explosion'); for(let p of players) { let reward = 100 + (stage * 2); if(!p.isDead) p.gold += reward; else p.gold += Math.floor(reward / 2); } createParticles(bossMonsters[i].x, bossMonsters[i].y, color(0, 100, 50), 150); bossMonsters.splice(i, 1); updateHUD(); }
+    }
+    handleMonsterArray(laserMonsters, 25); handleMonsterArray(magnetMonsters, 25);
+  }
+
+  for (let i = particles.length - 1; i >= 0; i--) { if (!isPaused) particles[i].update(); particles[i].display(); if (!isPaused && particles[i].life <= 0) particles.splice(i, 1); }
+  for(let i = floatingTexts.length - 1; i >= 0; i--) { if (!isPaused) floatingTexts[i].update(); floatingTexts[i].display(); if (floatingTexts[i].life <= 0) floatingTexts.splice(i, 1); }
+  
+  if (!isPaused) {
+    if (gameState === 'PREP') {
+      prepTimer--; drawCage(); if (prepTimer <= 0) startPlayingPhase();
+    } else if (gameState === 'PLAYING') {
+      if (allEnemies.length === 0) { 
+        if (stage >= 100) { gameState = 'ENDING'; document.getElementById('ending-screen').style.display = 'flex'; document.getElementById('status-msg').style.display = 'none'; document.getElementById('stage-info').style.display = 'none'; } 
+        else { stage++; startPrepPhase(); }
+      } 
+    }
+  } else if (gameState === 'PREP') { drawCage(); }
+}
+
+function drawArena() {
+  stroke(255, 10); strokeWeight(1); for(let i = -1500; i <= 1500; i += 100) { line(i, -1500, i, 1500); line(-1500, i, 1500, i); }
+  fill(0, 0, 10, 80); stroke(50, 100, 100, 50); strokeWeight(5); ellipse(0, 0, arenaRadius * 2); noFill(); stroke(50, 100, 100); strokeWeight(2);
+  ellipse(0, 0, 750 * 2); ellipse(0, 0, 850 * 2); ellipse(0, 0, 950 * 2); ellipse(0, 0, 1050 * 2);
+}
+
+function drawCage() {
+  push(); drawingContext.shadowBlur = 20; drawingContext.shadowColor = '#00ffff'; stroke(180, 100, 100, 80 + sin(frameCount*0.1)*40); strokeWeight(4); noFill();
+  rotate(frameCount * 0.02); drawingContext.setLineDash([15, 15]); ellipse(0, 0, cageRadius * 2.2); drawingContext.setLineDash([]); stroke(180, 100, 100, 50); ellipse(0, 0, cageRadius * 2);
+  for(let i=0; i<8; i++) { let a = (TWO_PI/8) * i; line(cos(a)*cageRadius, sin(a)*cageRadius, 0, 0); }
+  noStroke(); fill(180, 100, 100, 40); ellipse(0, 0, 40 + sin(frameCount*0.2)*10); pop();
+  if (gameState === 'PREP' && prepTimer <= 180 && prepTimer > 0) {
+    push(); fill(60, 100, 100); noStroke(); textAlign(CENTER, CENTER); textSize(60); textStyle(BOLD); drawingContext.shadowBlur = 20; drawingContext.shadowColor = '#ffff00'; text(ceil(prepTimer/60), 0, -cageRadius - 50); pop();
+  }
+}
+
+function createParticles(x, y, col, count) { for(let i=0; i<count; i++) particles.push(new Particle(x, y, col)); }
+class Particle {
+  constructor(x, y, col) {
+    this.x = x; this.y = y; let a = random(TWO_PI); let s = random(2, 10);
+    this.vx = cos(a) * s; this.vy = sin(a) * s; this.life = random(20, 40); this.maxLife = this.life;
+    this.h = hue(col); this.s = saturation(col); this.b = brightness(col);
+  }
+  update() { this.x += this.vx; this.y += this.vy; this.vx *= 0.9; this.vy *= 0.9; this.life--; }
+  display() { noStroke(); fill(this.h, this.s, this.b, (this.life/this.maxLife)*100); ellipse(this.x, this.y, 6); }
+}
+
+class FloatingText {
+  constructor(txt, x, y, col, size = 18) { this.txt = txt; this.x = x; this.y = y; this.col = col; this.life = 60; this.size = size; }
+  update() { this.y -= 1.5; this.life--; }
+  display() { push(); translate(this.x, this.y); textAlign(CENTER, CENTER); textSize(this.size); textStyle(BOLD); noStroke(); drawingContext.fillStyle = this.col; drawingContext.globalAlpha = this.life / 60; text(this.txt, 0, 0); drawingContext.globalAlpha = 1.0; pop(); }
+}
+function createFloatingText(x, y, txt, col, size = 18) { floatingTexts.push(new FloatingText(txt, x, y, col, size)); }
+
+class ElectricTrap {
+    constructor(x, y, r) { this.x = x; this.y = y; this.r = r; this.timer = 180; this.state = 0; }
+    update(players) {
+        if (this.state === 0) {
+            this.timer--;
+            if (this.timer <= 0) {
+                this.state = 1; this.timer = 15; playSound('explosion'); triggerShake(8);
+                for (let p of players) {
+                    if (!p.isDead && p.z < 10) {
+                        let dx = p.x - this.x; let dy = p.y - this.y;
+                        if (dx*dx + dy*dy < (this.r + p.r)*(this.r + p.r)) {
+                            if (p.babylonTimer <= 0 && p.invincibility <= 0 && (!devInvincible || !p.isReal)) {
+                                p.hp = 0; p.isDead = true; playSound('hit'); createParticles(p.x, p.y, color(60, 100, 100), 40);
+                                if (p.isReal) { triggerShake(6); updateHUD(); document.getElementById('damage-flash').style.display = 'block'; setTimeout(() => document.getElementById('damage-flash').style.display = 'none', 100); document.getElementById('dead-screen').style.display = 'flex'; }
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (this.state === 1) { this.timer--; if (this.timer <= 0) this.state = 2; }
+    }
+    display() {
+        push(); translate(this.x, this.y);
+        if (this.state === 0) {
+            noStroke(); fill(60, 100, 100, 30); ellipse(0, 0, this.r * 2); stroke(60, 100, 100, 150); strokeWeight(2); drawingContext.setLineDash([10, 10]); ellipse(0, 0, this.r * 2); drawingContext.setLineDash([]); fill(60, 100, 100); noStroke(); textAlign(CENTER, CENTER); textSize(30); textStyle(BOLD); text(ceil(this.timer/60), 0, 0);
+        } else if (this.state === 1) {
+            drawingContext.shadowBlur = 30; drawingContext.shadowColor = '#ffff00'; fill(60, 100, 100, 150); noStroke(); ellipse(0, 0, this.r * 2); stroke(255); strokeWeight(5); for(let i=0; i<5; i++) { line(random(-this.r, this.r), random(-this.r, this.r), random(-this.r, this.r), random(-this.r, this.r)); } drawingContext.shadowBlur = 0;
+        }
+        pop();
+    }
+}
+
+class SlowZone {
+  constructor() { let a = random(TWO_PI); let d = random(0, arenaRadius - 100); this.x = cos(a)*d; this.y = sin(a)*d; this.r = random(120, 180); this.state = 0; this.timer = 180;  }
+  update() { this.timer--; if(this.timer <= 0) { if(this.state === 0) { this.state = 1; this.timer = 180; } else { this.state = 2; } } }
+  display() {
+    push(); translate(this.x, this.y);
+    if(this.state === 0) { fill(280, 100, 100, 10); stroke(280, 100, 100, 60); strokeWeight(2); ellipse(0, 0, this.r * 2); fill(255); noStroke(); textAlign(CENTER, CENTER); textSize(40); textStyle(BOLD); text(ceil(this.timer/60), 0, 0); } 
+    else if (this.state === 1) { drawingContext.shadowBlur = 20; drawingContext.shadowColor = '#cc00ff'; fill(280, 100, 50, 40); stroke(280, 100, 80, 80); strokeWeight(4); ellipse(0, 0, this.r * 2); drawingContext.shadowBlur = 0; }
+    pop();
+  }
+}
+
+class EnemyLaser {
+  constructor(x, y, angle, damage) { this.x = x; this.y = y; this.damage = damage; this.speed = 25; this.vx = cos(angle) * this.speed; this.vy = sin(angle) * this.speed; this.life = 120; this.r = 10; playSound('laser'); }
+  update() { this.x += this.vx; this.y += this.vy; this.life--; }
+  checkCollision(players, rings) {
+    let hit = false;
+    for(let p of players) {
+      if(!p.isDead && p.invincibility <= 0 && p.z < 10 && (!devInvincible || !p.isReal)) { let dx = this.x - p.x; let dy = this.y - p.y; if (dx*dx + dy*dy < (this.r + p.r)*(this.r + p.r)) { p.takeDamage(); hit = true; } }
+    }
+    let dSq = this.x*this.x + this.y*this.y; let a = atan2(this.y, this.x); if(a < 0) a += TWO_PI;
+    for(let r=0; r<3; r++) {
+      let unrotatedA = (a - currentRingAngles[r]) % TWO_PI; if(unrotatedA < 0) unrotatedA += TWO_PI;
+      for(let slot of rings[r]) {
+        if(slot.hasTurret) {
+          let baseStart = slot.indexInRing * anglePerSlot; let baseEnd = baseStart + anglePerSlot; let rMin = slot.radius; let rMax = slot.radius + slot.width;
+          if(dSq > rMin*rMin && dSq < rMax*rMax && unrotatedA >= baseStart - 0.1 && unrotatedA < baseEnd + 0.1) { slot.takeDamage(this.damage); hit = true; return hit; }
+        }
+      }
+    } return hit;
+  }
+  display() { push(); translate(this.x, this.y); let angle = atan2(this.vy, this.vx); rotate(angle); drawingContext.shadowBlur = 20; drawingContext.shadowColor = '#ff0000'; fill(255); stroke(0, 100, 100); strokeWeight(4); rectMode(CENTER); rect(0, 0, 40, 6, 10); drawingContext.shadowBlur = 0; pop(); }
+}
+
+class BossMissile {
+  constructor(x, y, angle, damage) { this.x = x; this.y = y; this.damage = damage; this.speed = 8; this.vx = cos(angle) * this.speed; this.vy = sin(angle) * this.speed; this.life = 150; this.r = 10; }
+  update() { this.x += this.vx; this.y += this.vy; this.life--; }
+  checkCollision(players, rings) {
+    let hit = false;
+    for(let p of players) {
+      if(!p.isDead && p.invincibility <= 0 && p.z < 10) {
+        if (!devInvincible || !p.isReal) { let dx = this.x - p.x; let dy = this.y - p.y; if (dx*dx + dy*dy < (this.r + p.r)*(this.r + p.r)) { p.takeDamage(); hit = true; } }
+      }
+    }
+    let dSq = this.x*this.x + this.y*this.y; let a = atan2(this.y, this.x); if(a < 0) a += TWO_PI;
+    for(let r=0; r<3; r++) {
+      let unrotatedA = (a - currentRingAngles[r]) % TWO_PI; if(unrotatedA < 0) unrotatedA += TWO_PI;
+      for(let slot of rings[r]) {
+        if(slot.hasTurret) {
+          let baseStart = slot.indexInRing * anglePerSlot; let baseEnd = baseStart + anglePerSlot; let rMin = slot.radius; let rMax = slot.radius + slot.width;
+          if(dSq > rMin*rMin && dSq < rMax*rMax && unrotatedA >= baseStart - 0.1 && unrotatedA < baseEnd + 0.1) { slot.takeDamage(this.damage); hit = true; return hit; }
+        }
+      }
+    } return hit;
+  }
+  display() {
+    push(); translate(this.x, this.y); let angle = atan2(this.vy, this.vx); rotate(angle);
+    drawingContext.shadowBlur = 15; drawingContext.shadowColor = '#ff00ff'; fill(255); stroke(200, 0, 255); strokeWeight(3); ellipse(0, 0, 16, 10);
+    drawingContext.shadowBlur = 0; pop();
+  }
+}
+
+class Item {
+  constructor(x, y, type) { this.x = x; this.y = y; this.type = type; this.r = 20; this.floatOffset = random(TWO_PI); }
+  display() {
+    push(); translate(this.x, this.y + sin(frameCount*0.05 + this.floatOffset)*10); drawingContext.shadowBlur = 20; let cols = ['#ff4444', '#44aaff', '#ffce00', '#ffffff', '#00ff88', '#cc44ff']; drawingContext.shadowColor = cols[this.type]; stroke(0,0,50); strokeWeight(2); fill(color(cols[this.type]));
+    if (this.type === 0) { beginShape(); vertex(0, 10); bezierVertex(-15, -5, -10, -15, 0, -5); bezierVertex(10, -15, 15, -5, 0, 10); endShape(CLOSE); } 
+    else if (this.type === 1) { triangle(-10, -10, 10, -10, 0, 0); triangle(-10, 10, 10, 10, 0, 0); } 
+    else if (this.type === 2) { ellipse(0, 0, 16); fill(0); ellipse(0,0,6); } 
+    else if (this.type === 3) { beginShape(); for(let i=0; i<10; i++) { let a = i * TWO_PI/10 - HALF_PI; let d = i % 2 === 0 ? 12 : 5; vertex(cos(a)*d, sin(a)*d); } endShape(CLOSE); } 
+    else if (this.type === 4) { rectMode(CENTER); rect(0, 0, 8, 20); rect(0, 0, 20, 8); } 
+    else if (this.type === 5) { rectMode(CENTER); rect(0, 5, 16, 10); rect(0, -5, 10, 10); triangle(-5, -10, 5, -10, 0, -18); }
+    drawingContext.shadowBlur = 0; pop();
+  }
+}
+
+class Pad {
+  constructor(x, y, type) { this.x = x; this.y = y; this.type = type; this.r = 30; this.cooldown = 0; }
+  update(players) {
+    if (this.cooldown > 0) { this.cooldown--; return; }
+    for(let p of players) { 
+        let dx = p.x - this.x; let dy = p.y - this.y;
+        if (!p.isDead && p.z < 10 && dx*dx + dy*dy < (this.r + p.r)*(this.r + p.r)) { this.trigger(); this.cooldown = 600; break; } 
+    }
+  }
+  trigger() { triggerShake(4); ventActiveTimers[this.type] = 60; playSound('explosion');}
+  display() {
+    push(); translate(this.x, this.y); let isActive = this.cooldown <= 0;
+    if (isActive) { drawingContext.shadowBlur = 20; drawingContext.shadowColor = this.type === 0 ? '#ff3300' : '#00aaff'; stroke(this.type === 0 ? color(0, 100, 80) : color(200, 80, 100)); fill(this.type === 0 ? color(0, 80, 40, 50) : color(200, 80, 40, 50)); } 
+    else { drawingContext.shadowBlur = 0; stroke(0, 0, 30); fill(0, 0, 10, 50); }
+    strokeWeight(3); rectMode(CENTER); rotate(frameCount * 0.02); rect(0, 0, this.r * 1.5, this.r * 1.5, 8);
+    if (isActive) { noStroke(); fill(this.type === 0 ? color(0, 100, 100) : color(200, 100, 100)); let pulse = sin(frameCount * 0.1) * 5; ellipse(0, 0, 15 + pulse); }
+    if (!isActive) { noFill(); stroke(0, 0, 50); strokeWeight(4); arc(0, 0, this.r*2.5, this.r*2.5, -PI/2, -PI/2 + TWO_PI * (1 - this.cooldown/600)); }
+    pop();
+  }
+}
+
+function mousePressed(event) {
+  if (gameState === 'SETUP' || isPaused || !players || !players[0] || players[0].isDead) return;
+  if (event && event.target && event.target.closest('.action-menu')) return;
+  if (event && event.target && (event.target.id === 'btn-pause' || event.target.id === 'btn-limit-up' || event.target.className === 'revive-btn' || event.target.id === 'btn-fs')) return;
+  if (event && event.target && event.target.closest('#dev-mode-panel')) return;
+  if (event && event.target && event.target.closest('#chat-wrapper')) return;
+  if (event && event.target && event.target.closest('#mobile-controls')) return;
+
+  let mx = (mouseX - width/2) / camScale; let my = (mouseY - height/2) / camScale;
+  let dSq = mx*mx + my*my; let a = atan2(my, mx); if (a < 0) a += TWO_PI;
+  
+  let clickedSlot = false; document.getElementById('build-menu').style.display = 'none'; document.getElementById('upgrade-menu').style.display = 'none';
+
+  for(let r=0; r<3; r++) {
+    let unrotatedA = (a - currentRingAngles[r]) % TWO_PI; if (unrotatedA < 0) unrotatedA += TWO_PI; unrotatedA %= TWO_PI;
+    for(let slot of rings[r]) {
+      let baseStart = slot.indexInRing * anglePerSlot; let baseEnd = baseStart + anglePerSlot; let rMin = slot.radius; let rMax = slot.radius + slot.width;
+      if (dSq >= rMin*rMin && dSq <= rMax*rMax && unrotatedA >= baseStart && unrotatedA <= baseEnd) {
+        selectedSlot = slot; 
+        if (!slot.hasTurret) { let menu = document.getElementById('build-menu'); menu.style.left = mouseX + 'px'; menu.style.top = mouseY + 'px'; menu.style.display = 'block'; } 
+        else if (slot.owner === players[0]) {
+          let menu = document.getElementById('upgrade-menu'); let btnUpgrade = document.getElementById('btn-upgrade');
+          if (slot.level >= 5) { btnUpgrade.innerText = `최고 레벨 (MAX)`; } else { let cost = [0, 20, 40, 80, 150][slot.level]; btnUpgrade.innerText = `레벨업 (${cost}G)`; }
+          menu.style.left = mouseX + 'px'; menu.style.top = mouseY + 'px'; menu.style.display = 'block'; 
+        }
+        clickedSlot = true; break;
+      }
+    }
+    if (clickedSlot) break;
+  }
+  if (!clickedSlot) selectedSlot = null;
+}
+
+function closeMenus() { document.getElementById('build-menu').style.display = 'none'; document.getElementById('upgrade-menu').style.display = 'none'; selectedSlot = null; }
+
+function buyTurret(type) {
+  if (isPaused || !players || !players[0]) return;
+  let costs = [10, 5, 15]; let localPlayer = players[0]; let myTurretsCount = 0;
+  for(let r=0; r<3; r++) myTurretsCount += rings[r].filter(s => s.hasTurret && s.owner === localPlayer).length;
+  if (myTurretsCount >= localPlayer.maxTurrets) { alert(`최대 건설 한도(${localPlayer.maxTurrets}개)에 도달했습니다.`); closeMenus(); return; }
+  
+  if (selectedSlot && !selectedSlot.hasTurret && localPlayer.gold >= costs[type]) { 
+      localPlayer.gold -= costs[type]; selectedSlot.buildTurret(type, localPlayer); 
+      if (localPlayer.isReal) localPlayer.builtTurretsCount++; 
+      updateHUD(); playSound('build'); 
+  } else if (localPlayer.gold < costs[type]) { alert("골드가 부족합니다!"); }
+  closeMenus();
+}
+
+function upgradeTurret() {
+  if (isPaused || !players || !players[0]) return; let localPlayer = players[0];
+  if (selectedSlot && selectedSlot.hasTurret && selectedSlot.owner === localPlayer) {
+    if (selectedSlot.level >= 5) { alert("이미 최고 레벨입니다."); } 
+    else { let cost = [0, 20, 40, 80, 150][selectedSlot.level]; if (localPlayer.gold >= cost) { localPlayer.gold -= cost; selectedSlot.levelUp(); updateHUD(); playSound('build'); } else { alert(`골드가 부족합니다! (필요 골드: ${cost}G)`); } }
+  } closeMenus();
+}
+
+function sellTurret() {
+  if (isPaused || !players || !players[0]) return; let localPlayer = players[0];
+  if (selectedSlot && selectedSlot.hasTurret && selectedSlot.owner === localPlayer) { let refund = [0, 5, 15, 35, 75, 150][selectedSlot.level] || 5; localPlayer.gold += refund; selectedSlot.destroyTurret(); updateHUD(); }
+  closeMenus();
+}
+
+class Player {
+  constructor(isReal, id) {
+    this.isReal = isReal; this.id = id; this.color = color((id * 45) % 360, 80, 100);
+    this.x = random(-300, 300); this.y = random(-300, 300); this.z = 0; this.r = 15; this.baseSpeed = 8.0; 
+    this.maxHp = 3; this.hp = 3; this.isDead = false; this.invincibility = 0; this.gold = 50;
+    this.history = []; this.babylonTimer = 0; this.maxTurrets = 9; 
+    this.jumpTimer = 0; this.jumpCooldown = 0; this.jumpCharges = 0; this.slowTimer = 0;
+    this.builtTurretsCount = 0; this.isAwakened = false; this.attackCooldown = 0;
+  }
+  takeDamage() {
+    if (devInvincible && this.isReal) return;
+    if (this.invincibility <= 0 && this.babylonTimer <= 0 && this.z < 10 && !this.isDead) {
+      this.hp--; this.invincibility = 60; playSound('hit'); createParticles(this.x, this.y, color(0, 100, 100), 20);
+      if (this.isReal) { triggerShake(4); updateHUD(); document.getElementById('damage-flash').style.display = 'block'; setTimeout(() => document.getElementById('damage-flash').style.display = 'none', 100); }
+      if (this.hp <= 0) { this.isDead = true; if (this.isReal) { updateHUD(); document.getElementById('dead-screen').style.display = 'flex'; } }
+    }
+  }
+  update(itemsArr, allEnemies, slowZonesArr) {
+    if (this.isDead) { if (!this.isReal && this.gold >= 500 && random() > 0.98) { this.gold -= 500; this.isDead = false; this.hp = this.maxHp; this.invincibility = 180; createParticles(this.x, this.y, color(120, 100, 100), 50); updateHUD(); } return; }
+    if (this.invincibility > 0) this.invincibility--; if (this.babylonTimer > 0) this.babylonTimer--; if (this.jumpCooldown > 0) this.jumpCooldown--; if (this.slowTimer > 0) this.slowTimer--;
+    if(frameCount % 2 === 0) this.history.push({x: this.x, y: this.y}); if(this.history.length > 15) this.history.shift();
+    if (this.isReal && keys.Space && this.jumpCharges > 0 && this.z === 0 && this.jumpCooldown <= 0) { playSound('jump'); this.jumpTimer = 30; this.jumpCooldown = 15; this.jumpCharges--; updateHUD(); }
+    if (this.jumpTimer > 0) { this.z = sin(PI * (30 - this.jumpTimer) / 30) * 60; this.jumpTimer--; } else { this.z = 0; }
+    if (itemsArr && this.z < 10) { for (let i = itemsArr.length - 1; i >= 0; i--) { let dx = this.x - itemsArr[i].x; let dy = this.y - itemsArr[i].y; if (dx*dx + dy*dy < (this.r + itemsArr[i].r)*(this.r + itemsArr[i].r)) { this.applyItem(itemsArr[i].type); createParticles(this.x, this.y, color(60, 100, 100), 20); itemsArr.splice(i, 1); } } }
+    
+    let activeSpeed = this.baseSpeed + (this.babylonTimer > 0 ? 4 : 0); if (this.z > 0) activeSpeed *= 1.3; if (this.slowTimer > 0) activeSpeed *= 0.3; 
+    let inSlowZone = false;
+    for (let sz of slowZonesArr) { let dx = this.x - sz.x; let dy = this.y - sz.y; if (sz.state === 1 && dx*dx + dy*dy < (this.r + sz.r)*(this.r + sz.r)) { inSlowZone = true; break; } }
+    if (inSlowZone && this.babylonTimer <= 0) activeSpeed *= 0.75; 
+
+    let vx = 0, vy = 0;
+    if (this.isReal) {
+      let dx = 0, dy = 0; if (keys.ArrowUp) dy -= 1; if (keys.ArrowDown) dy += 1; if (keys.ArrowLeft) dx -= 1; if (keys.ArrowRight) dx += 1;
+      if (virtualJoy.active) { dx = virtualJoy.dx; dy = virtualJoy.dy; }
+      let len = dist(0,0,dx,dy); if(len > 0) { vx = (dx/len) * activeSpeed; vy = (dy/len) * activeSpeed; }
+
+      if (stage > 30 && this.builtTurretsCount === 0 && !this.isAwakened) { this.isAwakened = true; createFloatingText(this.x, this.y - 50, "🌟 무소유의 각성!", '#00ffaa', 32); playSound('jump'); }
+      if (this.isAwakened && this.z < 10 && gameState === 'PLAYING') {
+          if (this.attackCooldown > 0) this.attackCooldown--;
+          if (this.attackCooldown <= 0) {
+              let closestDistSq = Infinity; let target = null; let rangeSq = 450 * 450; 
+              for (let m of allEnemies) { let adx = this.x - m.x; let ady = this.y - m.y; let adSq = adx*adx + ady*ady; if (adSq < closestDistSq && adSq <= rangeSq) { closestDistSq = adSq; target = m; } }
+              if (target) { projectiles.push(new Projectile(this.x, this.y, target, 50, 1, 5, false)); playSound('shoot'); this.attackCooldown = 5; }
+          }
+      }
+    } else {
+      if (frameCount % 60 === this.id * 5) {
+        let myTurrets = []; for(let r=0; r<3; r++) myTurrets.push(...rings[r].filter(s => s.hasTurret && s.owner === this));
+        let upgradeLimitCost = 300 * (this.maxTurrets - 8);
+        if (this.gold >= upgradeLimitCost && myTurrets.length >= this.maxTurrets && random() > 0.5) { this.gold -= upgradeLimitCost; this.maxTurrets++; }
+        if (myTurrets.length < this.maxTurrets && this.gold >= 10 && random() > 0.4) {
+          let emptySlots = []; for(let r=0; r<3; r++) emptySlots.push(...rings[r].filter(s => !s.hasTurret));
+          if (emptySlots.length > 0) { let slot = random(emptySlots); let type = random([0, 1, 2]); let costs = [10, 5, 15]; if (this.gold >= costs[type]) { this.gold -= costs[type]; slot.buildTurret(type, this); } }
+        } else if (myTurrets.length > 0) {
+           let targetTurret = random(myTurrets);
+           if (this.gold >= 20 && targetTurret.level < 5 && random() > 0.5) { let cost = [0, 20, 40, 80, 150][targetTurret.level]; if (this.gold >= cost) { this.gold -= cost; targetTurret.levelUp(); } } 
+           else if (myTurrets.length >= this.maxTurrets && random() > 0.8) { let refund = [0, 5, 15, 35, 75, 150][targetTurret.level] || 5; this.gold += refund; targetTurret.destroyTurret(); }
+        }
+      }
+      let dCenterSq = this.x*this.x + this.y*this.y; let evadeX = 0, evadeY = 0; let closestMonsterDistSq = Infinity; let targetMonster = null;
+      for (let m of allEnemies) { let mdx = this.x - m.x; let mdy = this.y - m.y; let dSq = mdx*mdx + mdy*mdy; if (dSq < closestMonsterDistSq) { closestMonsterDistSq = dSq; targetMonster = m; } }
+      let targetItem = null; if (itemsArr && itemsArr.length > 0 && random() > 0.5) targetItem = itemsArr[0];
+      if (targetMonster && closestMonsterDistSq < 160000 && this.babylonTimer <= 0) { 
+        evadeX = (this.x - targetMonster.x); evadeY = (this.y - targetMonster.y); let evadeA = atan2(evadeY, evadeX) + (noise(this.id, frameCount*0.02) - 0.5) * 2; evadeX = cos(evadeA); evadeY = sin(evadeA);
+        if (closestMonsterDistSq < 22500 && this.jumpCharges > 0 && this.jumpCooldown <= 0 && random() > 0.2) { this.jumpTimer = 30; this.jumpCooldown = 15; this.jumpCharges--; playSound('jump'); }
+      } else if (targetItem) { evadeX = targetItem.x - this.x; evadeY = targetItem.y - this.y; } else { evadeX = noise(this.id, frameCount * 0.01) * 2 - 1; evadeY = noise(this.id + 100, frameCount * 0.01) * 2 - 1; }
+      let centerPullX = 0, centerPullY = 0; let safeR = arenaRadius - 150;
+      if (dCenterSq > safeR*safeR) { let dCenter = Math.sqrt(dCenterSq); let pullFactor = map(dCenter, safeR, arenaRadius, 0, 4); centerPullX = -this.x * pullFactor * 0.01; centerPullY = -this.y * pullFactor * 0.01; }
+      let finalVx = evadeX + centerPullX; let finalVy = evadeY + centerPullY; let len = dist(0,0,finalVx,finalVy);
+      if(len > 0) { vx = (finalVx/len) * activeSpeed; vy = (finalVy/len) * activeSpeed; }
+    }
+    
+    this.x += vx; this.y += vy; let dCenterSq = this.x*this.x + this.y*this.y;
+    if (dCenterSq > (arenaRadius - this.r)*(arenaRadius - this.r)) { let angle = atan2(this.y, this.x); this.x = cos(angle) * (arenaRadius - this.r); this.y = sin(angle) * (arenaRadius - this.r); }
+    if (gameState === 'PREP') { if (dCenterSq < (cageRadius + this.r)*(cageRadius + this.r)) { let angle = atan2(this.y, this.x); this.x = cos(angle) * (cageRadius + this.r); this.y = sin(angle) * (cageRadius + this.r); } }
+  }
+
+  applyItem(type) {
+    let msgs = [ {txt: "❤️ 생명력 회복!", col: '#ff4444'}, {txt: "⏳ 몬스터 둔화!", col: '#44aaff'}, {txt: "⚙️ 포탑 과부하!", col: '#ffce00'}, {txt: "🌟 무적 질주!", col: '#ffffff'}, {txt: "💚 부활의 기적!", col: '#00ff88'}, {txt: "🚀 바빌론의 도약!", col: '#cc44ff'} ];
+    createFloatingText(this.x, this.y - 30, msgs[type].txt, msgs[type].col, 28);
+    if (type === 0) { if (this.hp < 5) { this.hp++; if (this.maxHp < this.hp) this.maxHp = this.hp; if (this.isReal) updateHUD(); } } 
+    else if (type === 1) { globalMonsterSlowTimer = 300; } else if (type === 2) { globalTurretBoostTimer = 300; } else if (type === 3) { this.babylonTimer = 180; } 
+    else if (type === 4) { for(let p of players) { if (p.isDead) { p.isDead = false; p.hp = 1; p.invincibility = 120; createParticles(p.x, p.y, color(120, 100, 100), 40); } } if (this.isReal) { document.getElementById('dead-screen').style.display = 'none'; updateHUD(); } } 
+    else if (type === 5) { this.jumpCharges += 3; if (this.isReal) updateHUD(); }
+  }
+  
+  display() {
+    if (this.isDead) return;
+    if (this.invincibility > 0 && Math.floor(frameCount / 5) % 2 === 0 && this.babylonTimer <= 0) return;
+    if (this.history.length > 1) {
+      push(); noFill();
+      for (let i = 0; i < this.history.length - 1; i++) {
+        let v = i / this.history.length; strokeWeight(this.r * 1.5 * v);
+        let c = this.babylonTimer > 0 ? color(60, 100, 100) : this.color; stroke(hue(c), saturation(c), brightness(c), v * 80);
+        line(this.history[i].x, this.history[i].y, this.history[i+1].x, this.history[i+1].y);
+      } pop();
+    }
+    push(); 
+    if (this.z > 0) { fill(0, 50); noStroke(); ellipse(this.x, this.y, this.r * 2 - (this.z * 0.2)); }
+    translate(this.x, this.y - this.z);
+    if (this.babylonTimer > 0) { drawingContext.shadowBlur = 30; drawingContext.shadowColor = '#ffff00'; fill(60, 100, 100); } 
+    else { drawingContext.shadowBlur = 15; drawingContext.shadowColor = this.color.toString(); fill(this.color); }
+    if (this.isAwakened) { drawingContext.shadowBlur = 20; drawingContext.shadowColor = '#00ffaa'; noFill(); stroke(150, 255, 255, 150); strokeWeight(2); ellipse(0, 0, this.r * 3 + sin(frameCount * 0.1) * 5); drawingContext.shadowBlur = 0; }
+    stroke(255); strokeWeight(3); ellipse(0, 0, this.r * 2); fill(255); noStroke();
+    if (this.isReal) { drawStar(0, 0, 4, 8, 4); } else { ellipse(0, 0, 8); } drawingContext.shadowBlur = 0;
+    fill(255); textSize(16); textStyle(BOLD); textAlign(CENTER); let hpDots = ""; for(let i=0; i<this.hp; i++) hpDots += "■"; fill(0, 100, 100); text(hpDots, 0, -this.r - 26); fill(255); text(this.isReal ? "P1" : "AI", 0, -this.r - 8); textStyle(NORMAL);
+    pop();
+  }
+}
+
+function drawMonsterShape(ctx, img, typeKey, burn, freeze, shock, isCharging) {
+  if (img) {
+    let scale = ctx.r * 2.5; push();
+    if (burn > 0) tint(255, 100, 100); else if (freeze > 0) tint(100, 200, 255); else if (shock > 0) tint(255, 255, 100); 
+    imageMode(CENTER); image(img, 0, 0, scale, scale); 
+    if (isCharging) { let blink = (frameCount % 10 < 5) ? 255 : 50; noFill(); stroke(255, 0, 0, blink); strokeWeight(4); ellipse(0, 0, ctx.r * 3 + sin(frameCount * 0.5) * 5); fill(255, 0, 0, blink); noStroke(); textAlign(CENTER, CENTER); textStyle(BOLD); textSize(ctx.r * 1.5); text("!", 0, -ctx.r - 15); }
+    noTint(); pop();
+  } else {
+    if (burn > 0) { drawingContext.shadowBlur = 30; drawingContext.shadowColor = '#ff5500'; fill(10, 100, 50); stroke(10, 100, 80); } 
+    else if (freeze > 0) { drawingContext.shadowBlur = 20; drawingContext.shadowColor = '#00aaff'; fill(200, 80, 80); stroke(200, 20, 100); } 
+    else {
+      drawingContext.shadowBlur = 20; 
+      if (typeKey === 'normal') { fill(0, 100, 50); drawingContext.shadowColor = '#00ffaa'; stroke(160, 100, 80); }
+      else if (typeKey === 'double') { fill(30, 100, 50); drawingContext.shadowColor = '#ffaa00'; stroke(30, 100, 80); }
+      else if (typeKey === 'micro') { fill(280, 80, 50); drawingContext.shadowColor = '#ff00ff'; stroke(300, 100, 100); strokeWeight(4); } 
+      else if (typeKey === 'breaker') { fill(30, 20, 20); drawingContext.shadowColor = '#ff5500'; stroke(15, 100, 60); }
+      else if (typeKey === 'swarm') { fill(90, 100, 50); drawingContext.shadowColor = '#88ff00'; stroke(120, 100, 100); strokeWeight(4); } 
+      else if (typeKey === 'boss') { fill(350, 100, 20); drawingContext.shadowColor = '#ff0055'; stroke(350, 100, 80); }
+      else if (typeKey === 'laser') { fill(120, 100, 50); drawingContext.shadowColor = '#00ff00'; stroke(120, 100, 80); }
+      else if (typeKey === 'magnet') { fill(220, 100, 50); drawingContext.shadowColor = '#0000ff'; stroke(220, 100, 80); }
+    }
+    if (shock > 0) { stroke(200, 80, 100); strokeWeight(4); drawingContext.shadowColor = '#00aaff'; }
+    if (isCharging) { fill(0, 100, 100); }
+    let pulse = sin(frameCount * 0.2) * 4; if (freeze > 0) pulse = 0; 
+    if (typeKey !== 'micro' && typeKey !== 'swarm') strokeWeight(3); 
+    if (typeKey === 'breaker') { rectMode(CENTER); rotate(frameCount*0.05); rect(0,0, ctx.r*1.8, ctx.r*1.8, 5); rotate(-frameCount*0.05); }
+    else if (typeKey === 'double') { beginShape(); for(let i=0; i<8; i++){ let a=i*TWO_PI/8; let d=ctx.r+(i%2===0?pulse+5:pulse-5); vertex(cos(a)*d, sin(a)*d); } endShape(CLOSE); }
+    else if (typeKey === 'laser') { ellipse(0,0, ctx.r*2); fill(120, 100, 100); ellipse(0,0, ctx.r); }
+    else if (typeKey === 'magnet') { arc(0,0, ctx.r*2.5, ctx.r*2.5, -PI/2, PI/2); }
+    else { ellipse(0, 0, ctx.r * 2 + pulse); }
+    if (freeze > 0) { fill(200, 20, 100, 50); noStroke(); rectMode(CENTER); rect(0, 0, ctx.r * 2.2, ctx.r * 2.2, 5); }
+    drawingContext.shadowBlur = 0;
+  }
+}
+
+class Monster {
+  constructor(x, y, maxHp, id) {
+    this.x = x; this.y = y; this.r = 25; this.maxHp = maxHp; this.hp = maxHp;
+    this.baseSpeed = map(min(stage, 100), 1, 100, 3.5, 8.0); 
+    this.target = null; this.id = id;
+    this.canDash = stage >= 5; this.isCharging = false; this.isDashing = false;
+    this.dashTimer = random(180, 360); this.dashDuration = 0;
+    this.dashPowerMult = map(min(stage, 10), 5, 10, 2.0, 4.5); this.dashDurationMax = floor(map(min(stage, 10), 5, 10, 10, 25));
+    this.vx = 0; this.vy = 0; this.burnTimer = 0; this.freezeTimer = 0; this.shockTimer = 0; this.shockLevel = 0; this.sepX = 0; this.sepY = 0;
+  }
+  update(players, otherMonsters) {
+    if (this.burnTimer > 0) { this.burnTimer--; if (frameCount % 3 === 0) { this.hp -= 15 + (stage * 1.5); createParticles(this.x, this.y - 10, color(10, 100, 80), 2); } }
+    if (this.freezeTimer > 0) { this.freezeTimer--; if (frameCount % 10 === 0) this.hp -= 1 + (stage * 0.2); this.isCharging = false; this.isDashing = false; return; }
+    let minDistSq = Infinity; this.target = null;
+    for(let p of players) {
+      if(p.isDead || p.babylonTimer > 0 || p.z > 10) continue; 
+      let dx = this.x - p.x; let dy = this.y - p.y; let dSq = dx*dx + dy*dy;
+      if (dSq < minDistSq) { minDistSq = dSq; this.target = p; }
+      if (dSq < (this.r + p.r)*(this.r + p.r)) { if(!devInvincible || !p.isReal) p.takeDamage(); let a = atan2(p.y - this.y, p.x - this.x); p.x += cos(a) * 30; p.y += sin(a) * 30; }
+    }
+    let activeSpeed = this.baseSpeed; if (globalMonsterSlowTimer > 0) activeSpeed *= 0.4; if (this.shockTimer > 0) { activeSpeed *= (1 - SHOCK_SLOW_RATES[this.shockLevel]); this.shockTimer--; }
+    if (this.canDash) {
+      if (this.dashTimer > 0) this.dashTimer--;
+      if (this.dashTimer <= 0 && !this.isCharging && !this.isDashing) { this.isCharging = true; this.dashTimer = 45; this.vx = 0; this.vy = 0; } 
+      else if (this.isCharging && this.dashTimer <= 0) {
+        this.isCharging = false; this.isDashing = true; this.dashDuration = this.dashDurationMax; 
+        if (this.target) { let a = atan2(this.target.y - this.y, this.target.x - this.x); this.vx = cos(a) * (activeSpeed * this.dashPowerMult); this.vy = sin(a) * (activeSpeed * this.dashPowerMult); } triggerShake(3);
+      }
+      if (this.isDashing) {
+        this.x += this.vx; this.y += this.vy; this.dashDuration--; createParticles(this.x, this.y, color(0, 100, 50), 3); 
+        if (this.dashDuration <= 0) { this.isDashing = false; this.dashTimer = random(180, 360); }
+      }
+    }
+    if (!this.isCharging && !this.isDashing && this.target) {
+      let maxDSq = (this.r * 2.5) * (this.r * 2.5);
+      if ((frameCount + this.id) % 3 === 0) {
+          let sepX = 0, sepY = 0;
+          for (let o of otherMonsters) { if (o !== this) { let dx = this.x - o.x; let dy = this.y - o.y; let dSq = dx*dx + dy*dy; if (dSq > 0 && dSq < maxDSq) { sepX += dx * 0.05; sepY += dy * 0.05; } } }
+          this.sepX = sepX; this.sepY = sepY;
+      }
+      let a = atan2(this.target.y - this.y, this.target.x - this.x); this.x += cos(a) * activeSpeed + this.sepX; this.y += sin(a) * activeSpeed + this.sepY;
+    }
+    let dCenterSq = this.x*this.x + this.y*this.y;
+    if (dCenterSq > (arenaRadius - this.r - 20)*(arenaRadius - this.r - 20)) {
+      let a = atan2(this.y, this.x); if (a < 0) a += TWO_PI; let destroyedAny = false; let damageByRing = [6, 4, 2]; 
+      for(let r=0; r<3; r++) {
+        let unrotatedA = (a - currentRingAngles[r]) % TWO_PI; if (unrotatedA < 0) unrotatedA += TWO_PI;
+        for (let slot of rings[r]) {
+          let baseStart = slot.indexInRing * anglePerSlot; let baseEnd = baseStart + anglePerSlot;
+          if (slot.hasTurret && (unrotatedA >= baseStart - 0.2 && unrotatedA <= baseEnd + 0.2)) { slot.takeDamage(damageByRing[r]); destroyedAny = true; }
+        }
+      }
+      if (destroyedAny) { triggerShake(4); createParticles(this.x, this.y, color(30, 100, 100), 40); }
+      this.x *= 0.95; this.y *= 0.95; this.isDashing = false; 
+    }
+  }
+  takeDamage(amt) { this.hp -= amt; }
+  display() {
+    push(); translate(this.x, this.y); let hpRatio = this.hp / this.maxHp;
+    let angle = 0; if (this.target) angle = atan2(this.target.y - this.y, this.target.x - this.x); else if (this.vx !== 0 || this.vy !== 0) angle = atan2(this.vy, this.vx);
+    rotate(angle); drawMonsterShape(this, customImgs.normal, 'normal', this.burnTimer, this.freezeTimer, this.shockTimer, this.isCharging); rotate(-angle);
+    noStroke(); fill(0, 100, 30); rect(-25, -40, 50, 6); fill(120, 100, 80); rect(-25, -40, 50 * hpRatio, 6); pop();
+  }
+}
+
+class DoubleDashMonster extends Monster {
+  constructor(x, y, maxHp, id) { super(x, y, maxHp, id); this.dashCount = 0; }
+  update(players, otherMonsters) {
+    if (this.burnTimer > 0) { this.burnTimer--; if (frameCount % 3 === 0) { this.hp -= 15 + (stage * 1.5); createParticles(this.x, this.y - 10, color(10, 100, 80), 2); } }
+    if (this.freezeTimer > 0) { this.freezeTimer--; if (frameCount % 10 === 0) this.hp -= 1 + (stage * 0.2); this.isCharging = false; this.isDashing = false; this.dashCount = 0; return; }
+    let minDistSq = Infinity; this.target = null;
+    for(let p of players) {
+      if(p.isDead || p.babylonTimer > 0 || p.z > 10) continue; 
+      let dx = this.x - p.x; let dy = this.y - p.y; let dSq = dx*dx + dy*dy;
+      if (dSq < minDistSq) { minDistSq = dSq; this.target = p; }
+      if (dSq < (this.r + p.r)*(this.r + p.r)) { if(!devInvincible || !p.isReal) p.takeDamage(); let a = atan2(p.y - this.y, p.x - this.x); p.x += cos(a) * 30; p.y += sin(a) * 30; }
+    }
+    let activeSpeed = this.baseSpeed; if (globalMonsterSlowTimer > 0) activeSpeed *= 0.4; if (this.shockTimer > 0) { activeSpeed *= (1 - SHOCK_SLOW_RATES[this.shockLevel]); this.shockTimer--; }
+    if (this.canDash) {
+      if (this.dashTimer > 0) this.dashTimer--;
+      if (this.dashTimer <= 0 && !this.isCharging && !this.isDashing) { this.isCharging = true; this.dashTimer = 40; this.vx = 0; this.vy = 0; this.dashCount = 0; } 
+      else if (this.isCharging && this.dashTimer <= 0) {
+        this.isCharging = false; this.isDashing = true; this.dashDuration = this.dashDurationMax * 0.8; 
+        if (this.target) { let a = atan2(this.target.y - this.y, this.target.x - this.x); this.vx = cos(a) * (activeSpeed * this.dashPowerMult * 1.2); this.vy = sin(a) * (activeSpeed * this.dashPowerMult * 1.2); }
+        this.dashCount++; triggerShake(3);
+      }
+      if (this.isDashing) {
+        this.x += this.vx; this.y += this.vy; this.dashDuration--; createParticles(this.x, this.y, color(30, 100, 80), 3); 
+        if (this.dashDuration <= 0) { this.isDashing = false; if (this.dashCount === 1) { this.isCharging = true; this.dashTimer = 15; } else { this.dashCount = 0; this.dashTimer = random(180, 360); } }
+      }
+    }
+    if (!this.isCharging && !this.isDashing && this.target) {
+      let maxDSq = (this.r * 2.5) * (this.r * 2.5);
+      if ((frameCount + this.id) % 3 === 0) {
+          let sepX = 0, sepY = 0;
+          for (let o of otherMonsters) { if (o !== this) { let dx = this.x - o.x; let dy = this.y - o.y; let dSq = dx*dx + dy*dy; if (dSq > 0 && dSq < maxDSq) { sepX += dx * 0.05; sepY += dy * 0.05; } } }
+          this.sepX = sepX; this.sepY = sepY;
+      }
+      let a = atan2(this.target.y - this.y, this.target.x - this.x); this.x += cos(a) * activeSpeed + this.sepX; this.y += sin(a) * activeSpeed + this.sepY;
+    }
+    let dCenterSq = this.x*this.x + this.y*this.y;
+    if (dCenterSq > (arenaRadius - this.r - 20)*(arenaRadius - this.r - 20)) {
+      let a = atan2(this.y, this.x); if (a < 0) a += TWO_PI; let destroyedAny = false; let damageByRing = [6, 4, 2]; 
+      for(let r=0; r<3; r++) {
+        let unrotatedA = (a - currentRingAngles[r]) % TWO_PI; if (unrotatedA < 0) unrotatedA += TWO_PI;
+        for (let slot of rings[r]) {
+          let baseStart = slot.indexInRing * anglePerSlot; let baseEnd = baseStart + anglePerSlot;
+          if (slot.hasTurret && (unrotatedA >= baseStart - 0.2 && unrotatedA <= baseEnd + 0.2)) { slot.takeDamage(damageByRing[r]); destroyedAny = true; }
+        }
+      }
+      if (destroyedAny) { triggerShake(4); createParticles(this.x, this.y, color(30, 100, 100), 40); }
+      this.x *= 0.95; this.y *= 0.95; this.isDashing = false; this.dashCount = 0; this.dashTimer = random(180, 360);
+    }
+  }
+  display() {
+    push(); translate(this.x, this.y); let hpRatio = this.hp / this.maxHp;
+    let angle = 0; if (this.target) angle = atan2(this.target.y - this.y, this.target.x - this.x); else if (this.vx !== 0 || this.vy !== 0) angle = atan2(this.vy, this.vx);
+    rotate(angle); drawMonsterShape(this, customImgs.double, 'double', this.burnTimer, this.freezeTimer, this.shockTimer, this.isCharging); rotate(-angle);
+    noStroke(); fill(0, 100, 30); rect(-25, -40, 50, 6); fill(120, 100, 80); rect(-25, -40, 50 * hpRatio, 6); pop();
+  }
+}
+
+class MicroMonster extends Monster {
+  constructor(x, y, maxHp, speed) { super(x, y, maxHp, 0); this.r = 12; this.baseSpeed = speed; this.canDash = false; }
+  update(players, otherMonsters) {
+    if (this.burnTimer > 0) { this.burnTimer--; if (frameCount % 3 === 0) this.hp -= 10 + (stage * 0.5); }
+    if (this.freezeTimer > 0) { this.freezeTimer--; if (frameCount % 10 === 0) this.hp -= 0.5 + (stage * 0.1); return; }
+    let minDistSq = Infinity; this.target = null;
+    for(let p of players) {
+      if(p.isDead || p.babylonTimer > 0 || p.z > 10) continue; 
+      let dx = this.x - p.x; let dy = this.y - p.y; let dSq = dx*dx + dy*dy;
+      if (dSq < minDistSq) { minDistSq = dSq; this.target = p; }
+      if (dSq < (this.r + p.r)*(this.r + p.r)) { if(!devInvincible || !p.isReal) p.takeDamage(); let a = atan2(p.y - this.y, p.x - this.x); p.x += cos(a) * 15; p.y += sin(a) * 15; }
+    }
+    let activeSpeed = this.baseSpeed; if (globalMonsterSlowTimer > 0) activeSpeed *= 0.4; if (this.shockTimer > 0) { activeSpeed *= (1 - SHOCK_SLOW_RATES[this.shockLevel]); this.shockTimer--; }
+    if (this.target) {
+      let maxDSq = (this.r * 2.5) * (this.r * 2.5);
+      if ((frameCount + this.id) % 3 === 0) {
+          let sepX = 0, sepY = 0;
+          for (let o of otherMonsters) { if (o !== this) { let dx = this.x - o.x; let dy = this.y - o.y; let dSq = dx*dx + dy*dy; if (dSq > 0 && dSq < maxDSq) { sepX += dx * 0.05; sepY += dy * 0.05; } } }
+          this.sepX = sepX; this.sepY = sepY;
+      }
+      let a = atan2(this.target.y - this.y, this.target.x - this.x); this.x += cos(a) * activeSpeed + this.sepX; this.y += sin(a) * activeSpeed + this.sepY;
+    }
+    let dCenterSq = this.x*this.x + this.y*this.y; if (dCenterSq > (arenaRadius - this.r - 20)*(arenaRadius - this.r - 20)) { let a = atan2(this.y, this.x); if (a < 0) a += TWO_PI; this.x *= 0.95; this.y *= 0.95; }
+  }
+  display() {
+    push(); translate(this.x, this.y); let hpRatio = this.hp / this.maxHp;
+    let angle = 0; if (this.target) angle = atan2(this.target.y - this.y, this.target.x - this.x); else if (this.vx !== 0 || this.vy !== 0) angle = atan2(this.vy, this.vx);
+    rotate(angle); drawMonsterShape(this, customImgs.micro, 'micro', this.burnTimer, this.freezeTimer, this.shockTimer, false); rotate(-angle);
+    noStroke(); fill(0, 100, 30); rect(-12, -20, 24, 4); fill(120, 100, 80); rect(-12, -20, 24 * hpRatio, 4); pop();
+  }
+}
+
+class SwarmMonster extends MicroMonster {
+  constructor(x, y, maxHp, speed) { super(x, y, maxHp, speed); this.r = 14; }
+  display() {
+    push(); translate(this.x, this.y); let hpRatio = this.hp / this.maxHp;
+    let angle = 0; if (this.target) angle = atan2(this.target.y - this.y, this.target.x - this.x);
+    rotate(angle); drawMonsterShape(this, customImgs.swarm, 'swarm', this.burnTimer, this.freezeTimer, this.shockTimer, false); rotate(-angle);
+    noStroke(); fill(0, 100, 30); rect(-10, -20, 20, 4); fill(120, 100, 80); rect(-10, -20, 20 * hpRatio, 4); pop();
+  }
+}
+
+class BossMonster extends Monster {
+  constructor(x, y, maxHp, id) { 
+      super(x, y, maxHp, id); this.r = 60; this.baseSpeed = map(min(stage, 100), 10, 100, 2.0, 4.5); this.canDash = false; 
+      this.attackState = 0; this.attackCooldown = 300; this.stateTimer = 0; this.baseAngle = 0;
+  }
+  update(players, otherMonsters) {
+    if (this.burnTimer > 0) { this.burnTimer--; if (frameCount % 3 === 0) { this.hp -= 15 + (stage * 1.5); createParticles(this.x, this.y - 10, color(10, 100, 80), 2); } }
+    if (this.freezeTimer > 0) { this.freezeTimer--; if (frameCount % 10 === 0) this.hp -= 1 + (stage * 0.2); return; }
+    
+    let minDistSq = Infinity; this.target = null;
+    for(let p of players) {
+      if(p.isDead || p.babylonTimer > 0 || p.z > 10) continue; 
+      let dx = this.x - p.x; let dy = this.y - p.y; let dSq = dx*dx + dy*dy;
+      if (dSq < minDistSq) { minDistSq = dSq; this.target = p; }
+      if (dSq < (this.r + p.r)*(this.r + p.r)) { if(!devInvincible || !p.isReal) p.takeDamage(); let a = atan2(p.y - this.y, p.x - this.x); p.x += cos(a) * 40; p.y += sin(a) * 40; }
+    }
+
+    let activeSpeed = this.baseSpeed; if (globalMonsterSlowTimer > 0) activeSpeed *= 0.4; if (this.shockTimer > 0) { activeSpeed *= (1 - SHOCK_SLOW_RATES[this.shockLevel]); this.shockTimer--; }
+
+    if (this.attackState === 0) {
+        this.attackCooldown--;
+        if (this.attackCooldown <= 0 && this.target) { this.attackState = 1; this.baseAngle = atan2(this.target.y - this.y, this.target.x - this.x); this.stateTimer = 30; }
+        if (this.target) {
+            let maxDSq = (this.r * 2.5) * (this.r * 2.5);
+            if ((frameCount + this.id) % 3 === 0) {
+                let sepX = 0, sepY = 0;
+                for (let o of otherMonsters) { if (o !== this) { let dx = this.x - o.x; let dy = this.y - o.y; let dSq = dx*dx + dy*dy; if (dSq > 0 && dSq < maxDSq) { sepX += dx * 0.05; sepY += dy * 0.05; } } }
+                this.sepX = sepX; this.sepY = sepY;
+            }
+            let a = atan2(this.target.y - this.y, this.target.x - this.x); this.x += cos(a) * activeSpeed + this.sepX; this.y += sin(a) * activeSpeed + this.sepY;
+            this.vx = cos(a); this.vy = sin(a); 
+        }
+    } else if (this.attackState === 1) {
+        this.stateTimer--; if (this.stateTimer <= 0) { this.fireMissiles(this.baseAngle); this.attackState = 2; this.stateTimer = 40; }
+    } else if (this.attackState === 2) {
+        this.stateTimer--; if (this.stateTimer <= 0) { this.fireMissiles(this.baseAngle); this.attackState = 0; this.attackCooldown = 300; }
+    }
+
+    let dCenterSq = this.x*this.x + this.y*this.y;
+    if (dCenterSq > (arenaRadius - this.r - 20)*(arenaRadius - this.r - 20)) { let a = atan2(this.y, this.x); if (a < 0) a += TWO_PI; this.x *= 0.95; this.y *= 0.95; }
+  }
+
+  fireMissiles(baseAngle) {
+      let startAngle = baseAngle - Math.PI/2;
+      for (let i=0; i<=8; i++) { let a = startAngle + i * (Math.PI / 8); bossMissiles.push(new BossMissile(this.x, this.y, a, 10 + stage)); }
+      playSound('explosion'); triggerShake(8);
+  }
+
+  takeDamage(amt, sx, sy) {
+      if (sx !== undefined && sy !== undefined) {
+          let lookAngle = (this.attackState > 0) ? this.baseAngle : atan2(this.target ? this.target.y - this.y : this.vy, this.target ? this.target.x - this.x : this.vx);
+          let shieldAngle = lookAngle + Math.PI; 
+          let hitAngle = atan2(sy - this.y, sx - this.x); 
+          let diff = abs(hitAngle - shieldAngle); while (diff > Math.PI) diff = TWO_PI - diff;
+          if (diff < Math.PI/2) { 
+              createFloatingText(this.x - cos(hitAngle)*this.r, this.y - sin(hitAngle)*this.r, "BLOCKED", '#00ffff');
+              playSound('hit'); return; 
+          }
+      }
+      this.hp -= amt; 
+  }
+
+  display() {
+    push(); translate(this.x, this.y); let hpRatio = this.hp / this.maxHp;
+    let lookAngle = (this.attackState > 0) ? this.baseAngle : atan2(this.target ? this.target.y - this.y : this.vy, this.target ? this.target.x - this.x : this.vx);
+    rotate(lookAngle); drawMonsterShape(this, customImgs.boss, 'boss', this.burnTimer, this.freezeTimer, this.shockTimer, this.attackState > 0); rotate(-lookAngle);
+    if (this.hp > 0) {
+        let shieldAngle = lookAngle + Math.PI; noFill(); drawingContext.shadowBlur = 20; drawingContext.shadowColor = '#00ffff';
+        stroke(0, 255, 255, 200); strokeWeight(8); arc(0, 0, this.r * 2.8, this.r * 2.8, shieldAngle - Math.PI/2, shieldAngle + Math.PI/2); drawingContext.shadowBlur = 0;
+    }
+    fill(255); noStroke(); textAlign(CENTER); textStyle(BOLD); textSize(18); text("[BOSS]", 0, -this.r - 25);
+    noStroke(); fill(0, 100, 30); rect(-40, -this.r - 15, 80, 8); fill(120, 100, 80); rect(-40, -this.r - 15, 80 * hpRatio, 8); pop();
+  }
+}
+
+class BreakerMonster extends Monster {
+  constructor(x, y, maxHp, id) {
+    super(x, y, maxHp, id); this.r = 35; this.canDash = false;
+    this.laserTimer = random(240, 400); this.isAiming = false; this.aimTimer = 0; this.aimAngle = 0;
+  }
+  update(players, allEnemies) {
+    if (this.burnTimer > 0) { this.burnTimer--; if (frameCount % 3 === 0) { this.hp -= 15 + (stage * 1.5); createParticles(this.x, this.y - 10, color(10, 100, 80), 2); } }
+    if (this.freezeTimer > 0) { this.freezeTimer--; if (frameCount % 10 === 0) this.hp -= 1 + (stage * 0.2); this.isAiming = false; return; }
+    let activeSpeed = this.baseSpeed; if (globalMonsterSlowTimer > 0) activeSpeed *= 0.4; if (this.shockTimer > 0) { activeSpeed *= (1 - SHOCK_SLOW_RATES[this.shockLevel]); this.shockTimer--; }
+
+    let pDistSq = Infinity; this.target = null;
+    for(let p of players) {
+      if(p.isDead || p.babylonTimer > 0 || p.z > 10) continue; 
+      let dx = this.x - p.x; let dy = this.y - p.y; let dSq = dx*dx + dy*dy;
+      if (dSq < pDistSq) { pDistSq = dSq; this.target = p; }
+      if (dSq < (this.r + p.r)*(this.r + p.r)) { if(!devInvincible || !p.isReal) p.takeDamage(); let a = atan2(p.y - this.y, p.x - this.x); p.x += cos(a) * 40; p.y += sin(a) * 40; }
+    }
+
+    if (this.laserTimer > 0) this.laserTimer--;
+    if (this.laserTimer <= 0 && !this.isAiming && this.target) { this.isAiming = true; this.aimTimer = 45; }
+    if (this.isAiming) {
+        this.aimTimer--;
+        if (this.target && this.aimTimer > 15) { this.aimAngle = atan2(this.target.y - this.y, this.target.x - this.x); }
+        if (this.aimTimer <= 0) {
+            this.isAiming = false; enemyLasers.push(new EnemyLaser(this.x, this.y, this.aimAngle, 20 + stage)); this.laserTimer = random(240, 400); triggerShake(8);
+        }
+    } else if (this.target) {
+      let maxDSq = (this.r * 2.5) * (this.r * 2.5);
+      if ((frameCount + this.id) % 3 === 0) {
+          let sepX = 0, sepY = 0;
+          for (let o of allEnemies) { if (o !== this) { let dx = this.x - o.x; let dy = this.y - o.y; let dSq = dx*dx + dy*dy; if (dSq > 0 && dSq < maxDSq) { sepX += dx * 0.05; sepY += dy * 0.05; } } }
+          this.sepX = sepX; this.sepY = sepY;
+      }
+      let a = atan2(this.target.y - this.y, this.target.x - this.x); this.x += cos(a) * activeSpeed + this.sepX; this.y += sin(a) * activeSpeed + this.sepY;
+    }
+    let dCenterSq = this.x*this.x + this.y*this.y;
+    if (dCenterSq > (arenaRadius - this.r - 20)*(arenaRadius - this.r - 20)) { let a = atan2(this.y, this.x); if (a < 0) a += TWO_PI; this.x *= 0.90; this.y *= 0.90; }
+  }
+  display() {
+    push(); translate(this.x, this.y); let hpRatio = this.hp / this.maxHp;
+    if (this.isAiming) {
+        let blink = (frameCount % 10 < 5) ? 255 : 50; stroke(0, 100, 100, blink); strokeWeight(2); drawingContext.shadowBlur = 10; drawingContext.shadowColor = '#ff0000';
+        line(0, 0, cos(this.aimAngle)*800, sin(this.aimAngle)*800); drawingContext.shadowBlur = 0;
+    }
+    let angle = 0; if (this.target) angle = atan2(this.target.y - this.y, this.target.x - this.x);
+    rotate(angle); drawMonsterShape(this, customImgs.breaker, 'breaker', this.burnTimer, this.freezeTimer, this.shockTimer, this.isAiming); rotate(-angle);
+    noStroke(); fill(0, 100, 30); rect(-30, -45, 60, 8); fill(120, 100, 80); rect(-30, -45, 60 * hpRatio, 8); pop();
+  }
+}
+
+class LaserSlowMonster extends Monster {
+  constructor(x, y, maxHp, id) { super(x, y, maxHp, id); this.canDash = false; this.baseSpeed = map(min(stage, 100), 35, 100, 1.5, 3.5); this.aimAngle = 0; this.laserRange = 220; }
+  update(players, otherMonsters) {
+    super.update(players, otherMonsters);
+    if (this.target && this.freezeTimer <= 0) {
+      let targetA = atan2(this.target.y - this.y, this.target.x - this.x); let diff = targetA - this.aimAngle;
+      while (diff < -PI) diff += TWO_PI; while (diff > PI) diff -= TWO_PI; this.aimAngle += diff * 0.015; 
+      let dx = this.x - this.target.x; let dy = this.y - this.target.y; let pDistSq = dx*dx + dy*dy;
+      if (pDistSq < this.laserRange*this.laserRange) { 
+         if (abs(diff) < 0.15 && this.target.invincibility <= 0 && (!devInvincible || !this.target.isReal)) { this.target.slowTimer = 30; }
+      }
+    }
+  }
+  display() {
+    push(); translate(this.x, this.y); let hpRatio = this.hp / this.maxHp;
+    if (this.target && this.freezeTimer <= 0) {
+      drawingContext.shadowBlur = 10; drawingContext.shadowColor = '#00ff00'; stroke(120, 100, 100, 150); strokeWeight(4); line(0, 0, cos(this.aimAngle)*this.laserRange, sin(this.aimAngle)*this.laserRange); drawingContext.shadowBlur = 0;
+    }
+    let angle = this.aimAngle; rotate(angle); drawMonsterShape(this, customImgs.laser, 'laser', this.burnTimer, this.freezeTimer, this.shockTimer, false); rotate(-angle);
+    noStroke(); fill(0, 100, 30); rect(-25, -40, 50, 6); fill(120, 100, 80); rect(-25, -40, 50 * hpRatio, 6); pop();
+  }
+}
+
+class MagnetMonster extends Monster {
+  constructor(x, y, maxHp, id) { super(x, y, maxHp, id); this.canDash = false; this.baseSpeed = map(min(stage, 100), 45, 100, 1.0, 2.5); this.aimAngle = 0; this.pullRange = 250; this.coneHalfAngle = PI/10; }
+  update(players, otherMonsters) {
+    super.update(players, otherMonsters);
+    if (this.target && this.freezeTimer <= 0) {
+      let targetA = atan2(this.target.y - this.y, this.target.x - this.x); let diff = targetA - this.aimAngle;
+      while (diff < -PI) diff += TWO_PI; while (diff > PI) diff -= TWO_PI; this.aimAngle += diff * 0.01; 
+      let dx = this.x - this.target.x; let dy = this.y - this.target.y; let pDistSq = dx*dx + dy*dy;
+      if (pDistSq < this.pullRange*this.pullRange) { 
+         let pAngle = atan2(this.target.y - this.y, this.target.x - this.x); let angleDiff = abs(this.aimAngle - pAngle); if (angleDiff > PI) angleDiff = TWO_PI - angleDiff;
+         if (angleDiff < this.coneHalfAngle && this.target.invincibility <= 0 && (!devInvincible || !this.target.isReal)) { this.target.x -= cos(this.aimAngle) * 3; this.target.y -= sin(this.aimAngle) * 3; }
+      }
+    }
+  }
+  display() {
+    push(); translate(this.x, this.y); let hpRatio = this.hp / this.maxHp;
+    if (this.freezeTimer <= 0) {
+      noFill(); stroke(220, 100, 100, 50); strokeWeight(2); arc(0, 0, this.pullRange*2, this.pullRange*2, this.aimAngle - this.coneHalfAngle, this.aimAngle + this.coneHalfAngle);
+      fill(220, 100, 100, 20); noStroke(); arc(0, 0, this.pullRange*2, this.pullRange*2, this.aimAngle - this.coneHalfAngle, this.aimAngle + this.coneHalfAngle);
+    }
+    let angle = this.aimAngle; rotate(angle); drawMonsterShape(this, customImgs.magnet, 'magnet', this.burnTimer, this.freezeTimer, this.shockTimer, false); rotate(-angle);
+    noStroke(); fill(0, 100, 30); rect(-25, -40, 50, 6); fill(120, 100, 80); rect(-25, -40, 50 * hpRatio, 6); pop();
+  }
+}
+
+class TurretSlot {
+  constructor(ringIndex, indexInRing, radius, width) {
+    this.ringIndex = ringIndex; this.indexInRing = indexInRing; this.radius = radius; this.width = width;
+    this.hasTurret = false; this.turretType = -1; this.owner = null; this.cooldown = 0; this.level = 1; this.hp = 0; this.maxHp = 0;
+    this.angleStart = 0; this.angleEnd = 0; this.cx = 0; this.cy = 0;
+  }
+  updatePosition(currentRingAngle) {
+    this.angleStart = this.indexInRing * anglePerSlot + currentRingAngle; this.angleEnd = this.angleStart + anglePerSlot;
+    let midAngle = this.angleStart + anglePerSlot / 2; this.cx = cos(midAngle) * (this.radius + this.width / 2); this.cy = sin(midAngle) * (this.radius + this.width / 2);
+  }
+  getSynergyPartners() {
+    let partners = []; let myLogicalIndex = Math.round(currentRingAngles[this.ringIndex] / anglePerSlot) + this.indexInRing;
+    if (this.ringIndex > 0) { let innerRingLogicalIndex = Math.round(currentRingAngles[this.ringIndex-1] / anglePerSlot); for(let s of rings[this.ringIndex-1]) { if ((s.indexInRing + innerRingLogicalIndex) % slotsPerRing === myLogicalIndex % slotsPerRing) { partners.push(s); break; } } }
+    if (this.ringIndex < 2) { let outerRingLogicalIndex = Math.round(currentRingAngles[this.ringIndex+1] / anglePerSlot); for(let s of rings[this.ringIndex+1]) { if ((s.indexInRing + outerRingLogicalIndex) % slotsPerRing === myLogicalIndex % slotsPerRing) { partners.push(s); break; } } }
+    return partners;
+  }
+  buildTurret(type, owner) { this.hasTurret = true; this.turretType = type; this.owner = owner; this.level = 1; this.maxHp = this.level * 4; this.hp = this.maxHp; createParticles(this.cx, this.cy, color(50, 100, 100), 15); }
+  levelUp() { if (this.level < 5) { this.level++; this.maxHp = this.level * 4; this.hp = this.maxHp; createParticles(this.cx, this.cy, color(50, 100, 100), 25); } }
+  takeDamage(amt) {
+    if (!this.hasTurret) return;
+    this.hp -= amt; createParticles(this.cx, this.cy, color(0, 0, 100), 10); if (this.hp <= 0) this.destroyTurret();
+  }
+  destroyTurret() {
+    this.hasTurret = false; this.turretType = -1; this.owner = null; this.level = 1;
+    playSound('explosion'); createParticles(this.cx, this.cy, color(15, 80, 100), 30); if (this.owner && this.owner.isReal) updateHUD();
+  }
+  updateTurret(allEnemies) {
+    if (!this.hasTurret) return; if (this.cooldown > 0) this.cooldown--;
+    let isSynergy = false; let partners = this.getSynergyPartners(); for(let p of partners) { if (p.hasTurret && p.owner === this.owner) isSynergy = true; }
+
+    let closestDistSq = Infinity; let target = null;
+    let range = [800, 350, 450][this.turretType] * (1 + (this.level - 1) * 0.2); if (isSynergy) range *= 1.2; 
+    let maxCooldown = [90, 12, 10][this.turretType] * Math.max(0.2, (1 - (this.level - 1) * 0.2)); if (globalTurretBoostTimer > 0 && this.owner && this.owner.isReal) maxCooldown *= 0.3;
+    let damage = [120, 10, 1][this.turretType] * this.level; if (isSynergy) damage *= 1.5; 
+
+    for (let m of allEnemies) { let dx = this.cx - m.x; let dy = this.cy - m.y; let dSq = dx*dx + dy*dy; if (dSq < closestDistSq && dSq <= range*range) { closestDistSq = dSq; target = m; } }
+    
+    if (target && this.cooldown <= 0) {
+      if (this.turretType === 2) {
+        let tColor = color(220, 80, 80); stroke(tColor);
+        if (this.level === 1) { strokeWeight(3); line(this.cx, this.cy, target.x, target.y); } 
+        else if (this.level === 2) { strokeWeight(6); line(this.cx, this.cy, target.x, target.y); stroke(255, 200); strokeWeight(2); let midX = (this.cx + target.x)/2 + random(-20,20); let midY = (this.cy + target.y)/2 + random(-20,20); line(this.cx, this.cy, midX, midY); line(midX, midY, target.x, target.y); } 
+        else if (this.level === 3) { drawingContext.shadowBlur = 20; drawingContext.shadowColor = '#00aaff'; stroke(tColor); strokeWeight(10); line(this.cx, this.cy, target.x, target.y); stroke(255, 255); strokeWeight(4); line(this.cx, this.cy, target.x, target.y); for(let i=0; i<4; i++) { let mx = (this.cx + target.x)/2 + random(-40,40); let my = (this.cy + target.y)/2 + random(-40,40); stroke(tColor); strokeWeight(3); line(this.cx, this.cy, mx, my); line(mx, my, target.x, target.y); } noFill(); stroke(tColor); strokeWeight(2); ellipse(target.x, target.y, target.r*3 + random(-5,5)); drawingContext.shadowBlur = 0; }
+        else if (this.level === 4) { drawingContext.shadowBlur = 30; drawingContext.shadowColor = '#00aaff'; stroke(tColor); strokeWeight(12); line(this.cx, this.cy, target.x, target.y); stroke(255, 255); strokeWeight(6); line(this.cx, this.cy, target.x, target.y); for(let i=0; i<6; i++) { let mx = (this.cx + target.x)/2 + random(-50,50); let my = (this.cy + target.y)/2 + random(-50,50); stroke(tColor); strokeWeight(4); line(this.cx, this.cy, mx, my); line(mx, my, target.x, target.y); } noFill(); stroke(tColor); strokeWeight(3); ellipse(target.x, target.y, target.r*3.5 + random(-8,8)); drawingContext.shadowBlur = 0; }
+        else if (this.level === 5) { drawingContext.shadowBlur = 40; drawingContext.shadowColor = '#ffffff'; stroke(tColor); strokeWeight(15); line(this.cx, this.cy, target.x, target.y); stroke(255, 255); strokeWeight(8); line(this.cx, this.cy, target.x, target.y); for(let i=0; i<8; i++) { let mx = (this.cx + target.x)/2 + random(-60,60); let my = (this.cy + target.y)/2 + random(-60,60); stroke(255, 100, 255, 255); strokeWeight(4); line(this.cx, this.cy, mx, my); line(mx, my, target.x, target.y); } noFill(); stroke(255, 100, 255, 255); strokeWeight(4); ellipse(target.x, target.y, target.r*4 + random(-10,10)); drawingContext.shadowBlur = 0; }
+        target.takeDamage(damage, this.cx, this.cy); target.shockTimer = 30; target.shockLevel = this.level; playSound('shoot');
+      } else { projectiles.push(new Projectile(this.cx, this.cy, target, damage, this.turretType, this.level, isSynergy)); playSound('shoot'); }
+      this.cooldown = maxCooldown;
+    }
+  }
+  display(isHovered = false) {
+    push(); stroke(50, 100, 100, 30); strokeWeight(1);
+    
+    let tColor;
+    if (this.turretType === 0) tColor = color(0, 80, 60); 
+    else if (this.turretType === 1) tColor = color(120, 80, 60); 
+    else if (this.turretType === 2) tColor = color(220, 80, 80); 
+    else tColor = color(30, 80, 20);
+
+    if (isHovered && !this.hasTurret) fill(50, 100, 100, 40); else if (!this.hasTurret && gameState === 'PREP') fill(255, 3); else noFill();
+    
+    beginShape();
+    for(let a = this.angleStart; a <= this.angleEnd; a += 0.05) { vertex(cos(a)*this.radius, sin(a)*this.radius); }
+    for(let a = this.angleEnd; a >= this.angleStart; a -= 0.05) { vertex(cos(a)*(this.radius+this.width), sin(a)*(this.radius+this.width)); }
+    endShape(CLOSE);
+    
+    if (this.hasTurret) {
+      let partners = this.getSynergyPartners(); let isSynergy = false;
+      for(let p of partners) {
+        if (p.hasTurret && p.owner === this.owner) {
+          isSynergy = true;
+          if (this.ringIndex < p.ringIndex) { stroke(this.owner.color); strokeWeight(4); line(this.cx, this.cy, p.cx, p.cy); stroke(255, 150); strokeWeight(2); line(this.cx, this.cy, p.cx, p.cy); }
+        }
+      }
+
+      translate(this.cx, this.cy);
+      noStroke(); let auraColor = color(this.owner.color); auraColor.setAlpha(isSynergy ? 80 : 30); fill(auraColor); ellipse(0, 0, 50 + this.level * 10);
+      if (isSynergy) { auraColor.setAlpha(150); fill(auraColor); ellipse(0, 0, 30 + this.level * 5); }
+      
+      if (this.hp < this.maxHp) { if (frameCount % 20 < 10) stroke(0, 100, 100); else stroke(this.owner.color); } else { stroke(this.owner.color); }
+      
+      strokeWeight(2); fill(30, 80, 20);
+      if (this.level > 1) { noFill(); stroke(255, 80); strokeWeight(1); ellipse(0, 0, 40 + this.level * 10); }
+      if (this.level > 2) { rotate(frameCount * 0.05); stroke(this.owner.color); rect(-25, -25, 50, 50); rotate(-frameCount * 0.05); }
+      if (this.level > 3) { rotate(-frameCount * 0.08); stroke(255, 150); rect(-35, -35, 70, 70); rotate(frameCount * 0.08); }
+      if (this.level > 4) { stroke(this.owner.color); strokeWeight(3); ellipse(0, 0, 90); }
+
+      fill(tColor); stroke(this.owner.color); strokeWeight(2);
+      if (this.turretType === 0) { 
+        rectMode(CENTER); rect(0, 0, 30 + this.level*4, 30 + this.level*4); 
+        fill(0, 50); noStroke(); ellipse(0, 0, 15 + this.level*2);
+      } 
+      else if (this.turretType === 1) { 
+        scale(1 + this.level*0.2); triangle(-15, 15, 0, -15, 15, 15); 
+        stroke(255, 150); strokeWeight(2); line(0, -5, 0, 10);
+      } 
+      else if (this.turretType === 2) { 
+        ellipse(0, 0, 30 + this.level*5); 
+        if (this.level >= 2) { fill(255, 150); noStroke(); ellipse(0,0,10); } 
+        if (this.level >= 3) { fill(200, 80, 100); drawStar(0, 0, 8, 16, 5); } 
+        if (this.level >= 4) { fill(255, 255, 255); drawStar(0, 0, 12, 24, 6); } 
+        if (this.level >= 5) { fill(0, 255, 255); drawStar(0, 0, 16, 32, 8); } 
+      }
+      
+      fill(255); noStroke(); textSize(14); textStyle(BOLD); textAlign(CENTER, CENTER);
+      let statusTxt = isSynergy ? `Lv${this.level}⭐` : `Lv${this.level}`; text(statusTxt, 0, 0); textStyle(NORMAL);
+      
+      fill(0, 100, 50); rect(-15, -25, 30, 4); fill(120, 100, 80); rect(-15, -25, 30 * (this.hp/this.maxHp), 4);
+    }
+    pop();
+  }
+}
+
+class Projectile {
+  constructor(x, y, target, damage, type, level, isSynergy) {
+    this.x = x; this.y = y; this.target = target; this.damage = damage; this.type = type; this.level = level; this.isSynergy = isSynergy;
+    this.speed = (type === 0 ? 15 : 20) + level; let a = atan2(target.y - this.y, target.x - this.x); this.vx = cos(a) * this.speed; this.vy = sin(a) * this.speed; this.life = 100;
+  }
+  update() { this.x += this.vx; this.y += this.vy; this.life--; }
+  checkCollision() { 
+    if (this.target.hp <= 0) { this.life = 0; return false; } 
+    let dx = this.x - this.target.x; let dy = this.y - this.target.y;
+    if (dx*dx + dy*dy < (this.target.r + 10)*(this.target.r + 10)) { this.target.takeDamage(this.damage, this.x, this.y); playSound('hit'); createParticles(this.target.x, this.target.y, this.type === 0 ? color(0,100,100) : color(50,100,100), 5 * this.level); return true; }
+    return false;
+  }
+  display() {
+    push(); translate(this.x, this.y); noStroke(); let angle = atan2(this.vy, this.vx); rotate(angle); if (this.isSynergy) scale(1.3);
+    if (this.type === 0) { 
+      if (this.level === 1) { fill(0, 80, 80); ellipse(0, 0, 12); } 
+      else if (this.level === 2) { fill(0, 100, 80); ellipse(-5, 0, 18, 10); fill(0, 80, 100); ellipse(0, 0, 14); } 
+      else if (this.level === 3) { drawingContext.shadowBlur = 15; drawingContext.shadowColor = '#ffaa00'; fill(30, 100, 80); ellipse(-10, 0, 25, 14); fill(0, 80, 100); ellipse(0, 0, 18); fill(255); ellipse(0, 0, 8); drawingContext.shadowBlur = 0; }
+      else if (this.level === 4) { drawingContext.shadowBlur = 20; drawingContext.shadowColor = '#ff0000'; fill(0, 100, 80); ellipse(-15, 0, 30, 18); fill(0, 80, 100); ellipse(0, 0, 22); fill(255); ellipse(0, 0, 12); drawingContext.shadowBlur = 0; }
+      else if (this.level === 5) { drawingContext.shadowBlur = 30; drawingContext.shadowColor = '#ff00ff'; fill(280, 100, 80); ellipse(-20, 0, 40, 22); fill(0, 80, 100); ellipse(0, 0, 26); fill(255); ellipse(0, 0, 16); drawingContext.shadowBlur = 0; }
+    } else if (this.type === 1) { 
+      if (this.level === 1) { fill(120, 100, 80); ellipse(0, 0, 10, 4); } 
+      else if (this.level === 2) { fill(120, 100, 80); triangle(6, 0, -6, -4, -6, 4); stroke(120, 100, 80, 100); strokeWeight(2); line(-6, 0, -16, 0); } 
+      else if (this.level === 3) { drawingContext.shadowBlur = 10; drawingContext.shadowColor = '#00ffaa'; fill(150, 100, 100); triangle(10, 0, -10, -6, -10, 6); stroke(150, 100, 100); strokeWeight(3); line(-10, 0, -25, 0); drawingContext.shadowBlur = 0; }
+      else if (this.level === 4) { drawingContext.shadowBlur = 15; drawingContext.shadowColor = '#00aaff'; fill(200, 100, 100); triangle(14, 0, -12, -8, -12, 8); stroke(200, 100, 100); strokeWeight(4); line(-12, 0, -35, 0); drawingContext.shadowBlur = 0; }
+      else if (this.level === 5) { drawingContext.shadowBlur = 25; drawingContext.shadowColor = '#ffffff'; fill(120, 0, 100); triangle(18, 0, -15, -10, -15, 10); stroke(255); strokeWeight(5); line(-15, 0, -50, 0); drawingContext.shadowBlur = 0; }
+    }
+    pop();
+  }
+}
+</script>
+</body>
+</html>
